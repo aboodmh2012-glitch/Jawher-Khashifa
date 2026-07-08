@@ -245,7 +245,7 @@ class TripWebsiteController(http.Controller):
                     'phone': (post.get(f'phone_{index}') or request.env.user.partner_id.phone or request.env.user.partner_id.mobile or '').strip(),
                 }))
             booking.write({'passenger_ids': commands})
-            return request.redirect(f'/trip/booking/{booking.id}/payment')
+            return request.redirect(f'/trip/booking/{booking.id}/confirm-price')
         except (UserError, ValidationError) as exc:
             return request.render('trip.trip_passenger_details_template', {
                 'booking': self._get_user_booking(booking_id),

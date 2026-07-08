@@ -367,10 +367,17 @@ class TripBooking(models.Model):
     def _build_amadeus_travelers(self):
         self.ensure_one()
         travelers = []
+        adult_ids = []
+        infant_positions = []
         gender_map = {'male': 'MALE', 'female': 'FEMALE'}
         for index, passenger in enumerate(self.passenger_ids, start=1):
             if not passenger.first_name or not passenger.last_name:
                 raise UserError(_('Passenger first and last names are required.'))
+            if passenger.passenger_type == 'adult':
+                adult_ids.append(str(index))
+            elif passenger.passenger_type == 'infant':
+                # Position (0-based) of this infant in the travelers list built below.
+                infant_positions.append(len(travelers))
             traveler = {
                 'id': str(index),
                 'dateOfBirth': passenger.date_of_birth.isoformat() if passenger.date_of_birth else '1990-01-01',
@@ -403,6 +410,14 @@ class TripBooking(models.Model):
             travelers.append(traveler)
         if not travelers:
             raise UserError(_('Add at least one passenger before creating the supplier order.'))
+        # Amadeus requires every held infant to be linked to an accompanying
+        # adult (one infant per adult). Without associatedAdultId the Flight
+        # Create Orders call is rejected.
+        if infant_positions:
+            if len(infant_positions) > len(adult_ids):
+                raise UserError(_('Each infant must travel with an accompanying adult.'))
+            for infant_no, position in enumerate(infant_positions):
+                travelers[position]['associatedAdultId'] = adult_ids[infant_no]
         return travelers
 
 
