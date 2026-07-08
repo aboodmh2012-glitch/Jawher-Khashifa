@@ -1,0 +1,1 @@
+Amadeus Python SDK integration scaffold added. Replace direct requests with SDK wrapper.

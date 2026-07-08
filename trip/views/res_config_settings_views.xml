@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form_trip" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.trip</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="base.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form" position="inside">
+                <app data-string="Trip" string="Trip" name="trip">
+                    <block title="Travel API / Amadeus Settings">
+                        <setting string="Access Mode" help="Use Enterprise for new Amadeus production projects. Self-Service is kept only for legacy/testing." >
+                            <field name="trip_amadeus_access_mode"/>
+                        </setting>
+                        <setting string="Environment">
+                            <field name="trip_amadeus_environment"/>
+                        </setting>
+                        <setting string="Base URL Override" help="Optional for Amadeus Enterprise or API aggregators.">
+                            <field name="trip_amadeus_base_url" placeholder="https://api.amadeus.com"/>
+                        </setting>
+                        <setting string="OAuth Token URL Override" help="Optional. Required only if your provider uses a custom token endpoint.">
+                            <field name="trip_amadeus_token_url"/>
+                        </setting>
+                        <setting string="Client ID / API Key">
+                            <field name="trip_amadeus_client_id"/>
+                        </setting>
+                        <setting string="Client Secret">
+                            <field name="trip_amadeus_client_secret" password="True"/>
+                        </setting>
+                        <setting string="Timeout">
+                            <field name="trip_amadeus_timeout"/>
+                        </setting>
+                        <setting string="Queuing Office ID" help="Optional. Used for Amadeus Self-Service/consolidator routing in Flight Create Orders.">
+                            <field name="trip_amadeus_queuing_office_id"/>
+                        </setting>
+                        <setting string="Default Phone Country Code" help="Used for traveler phone contact when no country-code parser is configured.">
+                            <field name="trip_default_country_calling_code"/>
+                        </setting>
+                        <setting string="Travel Agent Email" help="Sent as the travelAgent contact in Amadeus Hotel Booking v2 orders.">
+                            <field name="trip_travel_agent_email"/>
+                        </setting>
+                        <setting string="API Payload Logging" help="Turn off in production if you do not want full passenger/search payloads stored in logs.">
+                            <field name="trip_amadeus_debug_logging"/>
+                        </setting>
+                    </block>
+                    <block title="Important Production Note">
+                        <div class="text-warning">
+                            Amadeus Self-Service access is legacy-only. Configure Enterprise access or an aggregator before production.
+                        </div>
+                    </block>
+                </app>
+            </xpath>
+        </field>
+    </record>
+</odoo>

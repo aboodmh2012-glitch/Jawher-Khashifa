@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="trip_menu_root" name="Trip" sequence="10" web_icon="trip,static/description/icon.png"/>
+    <menuitem id="trip_menu_operations" name="Operations" parent="trip_menu_root" sequence="10"/>
+    <menuitem id="trip_menu_config" name="Configuration" parent="trip_menu_root" sequence="90"/>
+    <menuitem id="trip_menu_reports" name="Reports" parent="trip_menu_root" sequence="80"/>
+
+    <menuitem id="trip_menu_bookings" name="Bookings" parent="trip_menu_operations" action="trip_booking_action" sequence="10"/>
+    <menuitem id="trip_menu_wallet" name="Wallet Transactions" parent="trip_menu_operations" action="trip_wallet_transaction_action" sequence="20"/>
+    <menuitem id="trip_menu_api_logs" name="API Logs" parent="trip_menu_operations" action="trip_api_log_action" sequence="30"/>
+    <menuitem id="trip_menu_pricing" name="Pricing Rules" parent="trip_menu_config" action="trip_pricing_rule_action" sequence="10"/>
+</odoo>
