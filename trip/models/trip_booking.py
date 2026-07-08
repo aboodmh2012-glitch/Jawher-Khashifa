@@ -430,21 +430,32 @@ class TripBooking(models.Model):
         return True
 
 
-    def _get_wallet_balance(self):
+    def _get_wallet_balance(self, target_currency=None):
+        """Return the customer's posted wallet balance in ``target_currency``.
+
+        Wallet top-ups/refunds/payments may be recorded in different
+        currencies; each transaction is converted to the target currency
+        (the booking currency by default) at today's rate so a booking is
+        never blocked just because the wallet was funded in another currency.
+        """
         self.ensure_one()
+        target_currency = target_currency or self.currency_id
         Wallet = self.env['trip.wallet.transaction'].sudo()
         txs = Wallet.search([
             ('partner_id', '=', self.partner_id.id),
             ('company_id', '=', self.company_id.id),
-            ('currency_id', '=', self.currency_id.id),
             ('state', '=', 'posted'),
         ])
+        today = fields.Date.context_today(self)
         balance = 0.0
         for tx in txs:
+            amount = tx.amount
+            if tx.currency_id and target_currency and tx.currency_id != target_currency:
+                amount = tx.currency_id._convert(amount, target_currency, self.company_id, today)
             if tx.transaction_type in ('topup', 'refund', 'adjustment'):
-                balance += tx.amount
+                balance += amount
             elif tx.transaction_type == 'booking_payment':
-                balance -= tx.amount
+                balance -= amount
         return balance
 
     def action_send_invoice_to_account(self):

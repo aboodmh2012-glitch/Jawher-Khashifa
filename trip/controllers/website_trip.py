@@ -20,8 +20,12 @@ class TripWebsiteController(http.Controller):
         return request.render('trip.flights_search_template', {})
 
     def _rate_limit_key(self):
-        ip = request.httprequest.headers.get('X-Forwarded-For', request.httprequest.remote_addr or 'unknown')
-        return f'trip.flight_search_rate.{ip.split(",")[0].strip()}'
+        # Use Odoo's resolved remote address (werkzeug ProxyFix applies the
+        # trusted X-Forwarded-For only when the server runs in proxy mode).
+        # Never trust a raw client-supplied X-Forwarded-For header here: it is
+        # spoofable and would let a caller bypass the search rate limit.
+        ip = request.httprequest.remote_addr or 'unknown'
+        return f'trip.search_rate.{ip}'
 
     def _check_rate_limit(self, limit=20, window_minutes=10):
         config = request.env['ir.config_parameter'].sudo()
@@ -39,7 +43,7 @@ class TripWebsiteController(http.Controller):
             if now - stamp < timedelta(minutes=window_minutes):
                 stamps.append(stamp)
         if len(stamps) >= limit:
-            raise UserError(_('Too many flight searches. Please wait a few minutes and try again.'))
+            raise UserError(_('Too many searches. Please wait a few minutes and try again.'))
         stamps.append(now)
         config.set_param(key, ','.join(stamp.isoformat() for stamp in stamps[-limit:]))
 
