@@ -7,4 +7,12 @@
         <field name="padding">5</field>
         <field name="company_id" eval="False"/>
     </record>
+
+    <record id="seq_trip_operation" model="ir.sequence">
+        <field name="name">Trip Operation</field>
+        <field name="code">trip.operation</field>
+        <field name="prefix">TOP/%(year)s/</field>
+        <field name="padding">5</field>
+        <field name="company_id" eval="False"/>
+    </record>
 </odoo>

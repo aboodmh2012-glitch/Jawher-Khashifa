@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- ============================================================= -->
+    <!-- Passenger report (list/search/action)                         -->
+    <!-- ============================================================= -->
+    <record id="trip_passenger_view_list" model="ir.ui.view">
+        <field name="name">trip.passenger.list</field>
+        <field name="model">trip.passenger</field>
+        <field name="arch" type="xml">
+            <list string="Passengers">
+                <field name="first_name"/>
+                <field name="last_name"/>
+                <field name="passenger_type"/>
+                <field name="nationality_id" optional="show"/>
+                <field name="passport_number" optional="show"/>
+                <field name="passport_expiry" optional="hide"/>
+                <field name="phone" optional="show"/>
+                <field name="email" optional="show"/>
+                <field name="ticket_number" optional="show"/>
+                <field name="booking_id"/>
+                <field name="company_id" groups="base.group_multi_company"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="trip_passenger_view_search" model="ir.ui.view">
+        <field name="name">trip.passenger.search</field>
+        <field name="model">trip.passenger</field>
+        <field name="arch" type="xml">
+            <search string="Search Passengers">
+                <field name="first_name"/>
+                <field name="last_name"/>
+                <field name="passport_number"/>
+                <field name="phone"/>
+                <field name="email"/>
+                <field name="ticket_number"/>
+                <field name="booking_id"/>
+                <filter string="With Passport" name="with_passport" domain="[('passport_number', '!=', False)]"/>
+                <group expand="0" string="Group By">
+                    <filter string="Type" name="group_type" context="{'group_by': 'passenger_type'}"/>
+                    <filter string="Nationality" name="group_nat" context="{'group_by': 'nationality_id'}"/>
+                    <filter string="Customer" name="group_partner" context="{'group_by': 'booking_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="trip_passenger_action" model="ir.actions.act_window">
+        <field name="name">Passengers</field>
+        <field name="res_model">trip.passenger</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- ============================================================= -->
+    <!-- Reporting actions (reuse booking pivot/graph/list)            -->
+    <!-- ============================================================= -->
+    <record id="trip_report_sales_action" model="ir.actions.act_window">
+        <field name="name">Sales Report</field>
+        <field name="res_model">trip.booking</field>
+        <field name="view_mode">pivot,graph,list</field>
+        <field name="domain">[('state', 'not in', ('cancelled', 'failed'))]</field>
+        <field name="context">{'search_default_group_booking_month': 1, 'search_default_group_agent': 1}</field>
+    </record>
+
+    <record id="trip_report_tickets_action" model="ir.actions.act_window">
+        <field name="name">Ticket Report</field>
+        <field name="res_model">trip.booking</field>
+        <field name="view_mode">list,pivot,graph,form</field>
+        <field name="domain">[('booking_type', '=', 'flight')]</field>
+        <field name="context">{'search_default_group_ticket_status': 1}</field>
+    </record>
+
+    <record id="trip_report_agents_action" model="ir.actions.act_window">
+        <field name="name">Agent Report</field>
+        <field name="res_model">trip.booking</field>
+        <field name="view_mode">pivot,graph,list</field>
+        <field name="context">{'search_default_group_agent': 1}</field>
+    </record>
+
+    <record id="trip_report_financial_action" model="ir.actions.act_window">
+        <field name="name">Financial Report</field>
+        <field name="res_model">trip.booking</field>
+        <field name="view_mode">pivot,list,graph</field>
+        <field name="context">{'search_default_group_booking_month': 1}</field>
+    </record>
+
+    <record id="trip_report_api_errors_action" model="ir.actions.act_window">
+        <field name="name">API Error Report</field>
+        <field name="res_model">trip.api.log</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('status', '=', 'failed')]</field>
+    </record>
+</odoo>

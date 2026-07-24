@@ -18,6 +18,9 @@ class TripPassenger(models.Model):
     passport_expiry = fields.Date()
     email = fields.Char()
     phone = fields.Char()
+    is_lead = fields.Boolean(string='Lead Passenger')
+    ticket_number = fields.Char(string='Ticket Number')
+    seat_number = fields.Char(string='Seat')
 
 
     @api.constrains('passport_expiry')

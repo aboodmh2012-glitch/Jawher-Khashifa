@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="action_report_trip_booking" model="ir.actions.report">
+        <field name="name">Trip Booking / Ticket</field>
+        <field name="model">trip.booking</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">trip.report_trip_booking</field>
+        <field name="report_file">trip.report_trip_booking</field>
+        <field name="binding_model_id" ref="model_trip_booking"/>
+        <field name="binding_type">report</field>
+    </record>
+
+    <template id="report_trip_booking">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="doc">
+                <t t-call="web.external_layout">
+                    <div class="page">
+                        <h2>
+                            Booking <span t-field="doc.name"/>
+                            <small t-if="doc.is_manual" class="text-muted"> (Manual)</small>
+                        </h2>
+                        <div class="row mt-3">
+                            <div class="col-6">
+                                <strong>Customer:</strong> <span t-field="doc.partner_id"/><br/>
+                                <strong>Agent:</strong> <span t-field="doc.agent_id"/><br/>
+                                <strong>Type:</strong> <span t-field="doc.booking_type"/><br/>
+                                <strong>Source:</strong> <span t-field="doc.source_system"/>
+                            </div>
+                            <div class="col-6">
+                                <strong>PNR:</strong> <span t-field="doc.pnr"/><br/>
+                                <strong>Ticket No:</strong> <span t-field="doc.ticket_number"/><br/>
+                                <strong>Airline:</strong> <span t-field="doc.airline"/><br/>
+                                <strong>Ticket Status:</strong> <span t-field="doc.ticket_status"/>
+                            </div>
+                        </div>
+
+                        <t t-if="doc.passenger_ids">
+                            <h4 class="mt-4">Passengers</h4>
+                            <table class="table table-sm o_main_table">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th><th>Type</th><th>Passport</th><th>Ticket No</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr t-foreach="doc.passenger_ids" t-as="p">
+                                        <td><span t-field="p.first_name"/> <span t-field="p.last_name"/></td>
+                                        <td><span t-field="p.passenger_type"/></td>
+                                        <td><span t-field="p.passport_number"/></td>
+                                        <td><span t-field="p.ticket_number"/></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </t>
+
+                        <t t-if="doc.flight_segment_ids">
+                            <h4 class="mt-4">Flights</h4>
+                            <table class="table table-sm o_main_table">
+                                <thead>
+                                    <tr>
+                                        <th>Flight</th><th>From</th><th>To</th><th>Departure</th><th>Arrival</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr t-foreach="doc.flight_segment_ids" t-as="s">
+                                        <td><span t-field="s.flight_number"/></td>
+                                        <td><span t-field="s.origin_airport"/></td>
+                                        <td><span t-field="s.destination_airport"/></td>
+                                        <td><span t-field="s.departure_time"/></td>
+                                        <td><span t-field="s.arrival_time"/></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </t>
+
+                        <h4 class="mt-4">Financial Summary</h4>
+                        <table class="table table-sm">
+                            <tr><td>Net Cost</td><td class="text-end"><span t-field="doc.net_cost"/></td></tr>
+                            <tr><td>Markup</td><td class="text-end"><span t-field="doc.markup_amount"/></td></tr>
+                            <tr><td>Commission</td><td class="text-end"><span t-field="doc.commission_amount"/></td></tr>
+                            <tr><th>Total</th><th class="text-end"><span t-field="doc.total_amount"/></th></tr>
+                        </table>
+
+                        <p class="mt-3">
+                            <strong>Payment Status:</strong> <span t-field="doc.payment_status"/>
+                            <t t-if="doc.payment_reference"> — <span t-field="doc.payment_reference"/></t>
+                        </p>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+</odoo>

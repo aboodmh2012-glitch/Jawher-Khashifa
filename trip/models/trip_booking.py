@@ -61,10 +61,106 @@ class TripBooking(models.Model):
     payment_reference = fields.Char(string='Payment Reference')
     internal_notes = fields.Text(string='Internal Notes')
 
-    @api.depends('net_amount', 'markup_amount')
+    # ------------------------------------------------------------------
+    # Manual entry & external-source tracking
+    # ------------------------------------------------------------------
+    is_manual = fields.Boolean(
+        string='Manual Entry', default=False, tracking=True,
+        help='Set for operations captured manually from a source outside this system.')
+    source_system = fields.Selection([
+        ('app', 'Online / App'),
+        ('amadeus_gds', 'Amadeus / GDS'),
+        ('airline_portal', 'Airline Portal'),
+        ('arc_external', 'ARC / External System'),
+        ('office_booking', 'Office Booking'),
+        ('other', 'Other External Source'),
+    ], string='Source System', default='app', tracking=True)
+    booking_date = fields.Date(string='Booking Date', default=fields.Date.context_today, index=True)
+
+    # ------------------------------------------------------------------
+    # Ticket information
+    # ------------------------------------------------------------------
+    airline = fields.Char(string='Airline')
+    flight_number = fields.Char(string='Flight Number')
+    booking_reference = fields.Char(string='Booking Reference')
+    issue_date = fields.Date(string='Issue Date')
+    travel_date = fields.Date(string='Travel Date')
+    ticket_status = fields.Selection([
+        ('none', 'Not Ticketed'),
+        ('pending', 'Pending'),
+        ('issued', 'Issued'),
+        ('cancelled', 'Cancelled'),
+        ('void', 'Void'),
+        ('refunded', 'Refund'),
+        ('exchanged', 'Exchange / Reissue'),
+    ], string='Ticket Status', default='none', tracking=True, index=True)
+
+    # ------------------------------------------------------------------
+    # Detailed financials (cost / selling / profit)
+    # ------------------------------------------------------------------
+    base_fare = fields.Monetary(currency_field='currency_id', string='Base Fare')
+    tax_amount = fields.Monetary(currency_field='currency_id', string='Taxes')
+    fee_amount = fields.Monetary(currency_field='currency_id', string='Fees')
+    net_cost = fields.Monetary(currency_field='currency_id', string='Net Cost', compute='_compute_net_cost', store=True,
+                               help='Supplier cost. Base Fare + Taxes + Fees when provided, otherwise the Net Amount.')
+    selling_price = fields.Monetary(currency_field='currency_id', string='Selling Price',
+                                    help='Price charged to the customer. Drives the total for manual bookings.')
+    profit = fields.Monetary(currency_field='currency_id', string='Profit', compute='_compute_profit', store=True)
+
+    # ------------------------------------------------------------------
+    # Operations log & search helpers
+    # ------------------------------------------------------------------
+    operation_ids = fields.One2many('trip.operation', 'booking_id', string='Operations')
+    operation_count = fields.Integer(compute='_compute_operation_count')
+    passenger_names = fields.Char(string='Passenger Names', compute='_compute_passenger_search', store=True)
+    passport_numbers = fields.Char(string='Passport Numbers', compute='_compute_passenger_search', store=True)
+    contact_phones = fields.Char(string='Contact Phones', compute='_compute_passenger_search', store=True)
+    contact_emails = fields.Char(string='Contact Emails', compute='_compute_passenger_search', store=True)
+    invoice_number = fields.Char(related='invoice_id.name', string='Invoice Number', store=True)
+
+    @api.depends('net_amount', 'markup_amount', 'selling_price')
     def _compute_total_amount(self):
         for rec in self:
-            rec.total_amount = (rec.net_amount or 0.0) + (rec.markup_amount or 0.0)
+            if rec.selling_price:
+                rec.total_amount = rec.selling_price
+            else:
+                rec.total_amount = (rec.net_amount or 0.0) + (rec.markup_amount or 0.0)
+
+    @api.depends('base_fare', 'tax_amount', 'fee_amount', 'net_amount')
+    def _compute_net_cost(self):
+        for rec in self:
+            detailed = (rec.base_fare or 0.0) + (rec.tax_amount or 0.0) + (rec.fee_amount or 0.0)
+            rec.net_cost = detailed or (rec.net_amount or 0.0)
+
+    @api.depends('total_amount', 'net_cost', 'commission_amount')
+    def _compute_profit(self):
+        for rec in self:
+            rec.profit = (rec.total_amount or 0.0) - (rec.net_cost or 0.0) - (rec.commission_amount or 0.0)
+
+    @api.depends('operation_ids')
+    def _compute_operation_count(self):
+        for rec in self:
+            rec.operation_count = len(rec.operation_ids)
+
+    @api.depends('passenger_ids.first_name', 'passenger_ids.last_name',
+                 'passenger_ids.passport_number', 'passenger_ids.phone', 'passenger_ids.email')
+    def _compute_passenger_search(self):
+        for rec in self:
+            names, passports, phones, emails = [], [], [], []
+            for p in rec.passenger_ids:
+                full = ' '.join(filter(None, [p.first_name, p.last_name]))
+                if full:
+                    names.append(full)
+                if p.passport_number:
+                    passports.append(p.passport_number)
+                if p.phone:
+                    phones.append(p.phone)
+                if p.email:
+                    emails.append(p.email)
+            rec.passenger_names = ', '.join(names)
+            rec.passport_numbers = ', '.join(passports)
+            rec.contact_phones = ', '.join(phones)
+            rec.contact_emails = ', '.join(emails)
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -87,6 +183,97 @@ class TripBooking(models.Model):
 
     def action_cancel(self):
         self.write({'state': 'cancelled'})
+
+    # ------------------------------------------------------------------
+    # Manual operations (booking/issue/payment/void/refund/exchange)
+    # ------------------------------------------------------------------
+    def _log_operation(self, operation_type, amount=None, values=None):
+        """Create a trip.operation record attached to this booking."""
+        self.ensure_one()
+        vals = {
+            'booking_id': self.id,
+            'company_id': self.company_id.id,
+            'partner_id': self.partner_id.id,
+            'agent_id': self.agent_id.id,
+            'operation_type': operation_type,
+            'is_manual': True,
+            'source_system': self.source_system if self.source_system != 'app' else 'other',
+            'currency_id': self.currency_id.id,
+            'amount': self.total_amount if amount is None else amount,
+            'pnr': self.pnr,
+            'ticket_number': self.ticket_number,
+            'state': 'confirmed',
+        }
+        if values:
+            vals.update(values)
+        return self.env['trip.operation'].create(vals)
+
+    def action_manual_issue_ticket(self):
+        for booking in self:
+            booking._log_operation('ticket_issue')
+            booking.write({
+                'ticket_status': 'issued',
+                'state': 'ticketed',
+                'is_manual': True,
+                'issue_date': booking.issue_date or fields.Date.context_today(booking),
+            })
+        return True
+
+    def action_manual_register_payment(self):
+        for booking in self:
+            if not booking.invoice_id:
+                booking.action_create_invoice()
+            booking._log_operation('payment', values={
+                'payment_method': booking.payment_method,
+                'payment_status': 'paid',
+                'payment_reference': booking.payment_reference or _('Manual payment'),
+                'invoice_id': booking.invoice_id.id if booking.invoice_id else False,
+            })
+            booking.write({
+                'payment_status': 'paid',
+                'is_manual': True,
+                'payment_reference': booking.payment_reference or _('Manual payment confirmed'),
+            })
+        return True
+
+    def action_manual_void(self):
+        for booking in self:
+            booking._log_operation('void')
+            booking.write({'ticket_status': 'void', 'state': 'cancelled', 'is_manual': True})
+        return True
+
+    def action_manual_refund(self):
+        for booking in self:
+            booking._log_operation('refund', amount=-abs(booking.total_amount or 0.0))
+            booking.write({
+                'ticket_status': 'refunded',
+                'payment_status': 'refunded',
+                'state': 'cancelled',
+                'is_manual': True,
+            })
+        return True
+
+    def action_manual_exchange(self):
+        for booking in self:
+            booking._log_operation('exchange')
+            booking.write({'ticket_status': 'exchanged', 'is_manual': True})
+        return True
+
+    def action_view_operations(self):
+        self.ensure_one()
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('Operations'),
+            'res_model': 'trip.operation',
+            'view_mode': 'list,form',
+            'domain': [('booking_id', '=', self.id)],
+            'context': {
+                'default_booking_id': self.id,
+                'default_partner_id': self.partner_id.id,
+                'default_agent_id': self.agent_id.id,
+                'default_currency_id': self.currency_id.id,
+            },
+        }
 
     def action_apply_pricing_rule(self):
         for booking in self:

@@ -12,16 +12,23 @@
         <field name="arch" type="xml">
             <list decoration-success="state in ('confirmed','ticketed')" decoration-danger="state in ('failed','cancelled')">
                 <field name="name"/>
+                <field name="booking_date"/>
                 <field name="partner_id"/>
                 <field name="agent_id"/>
                 <field name="booking_type"/>
                 <field name="booking_source"/>
+                <field name="is_manual"/>
+                <field name="airline" optional="show"/>
+                <field name="pnr"/>
+                <field name="ticket_number" optional="show"/>
+                <field name="ticket_status"/>
                 <field name="state"/>
                 <field name="payment_status"/>
-                            <field name="payment_method"/>
-                            <field name="payment_reference"/>
-                <field name="pnr"/>
-                <field name="total_amount"/>
+                <field name="payment_method" optional="hide"/>
+                <field name="payment_reference" optional="hide"/>
+                <field name="net_cost" optional="hide" sum="Net Cost"/>
+                <field name="total_amount" sum="Total"/>
+                <field name="profit" optional="show" sum="Profit"/>
                 <field name="currency_id"/>
             </list>
         </field>
@@ -46,9 +53,19 @@
                     <button name="action_confirm_booking" string="Confirm" type="object" class="btn-primary" invisible="state not in ('priced','pending_payment','booked')"/>
                     <button name="action_mark_ticketed" string="Mark Ticketed" type="object" class="btn-primary" invisible="state not in ('booked','confirmed')"/>
                     <button name="action_cancel" string="Cancel" type="object" class="btn-danger" invisible="state in ('cancelled','ticketed')"/>
+                    <button name="action_manual_issue_ticket" string="Manual Issue" type="object" class="btn-secondary" invisible="ticket_status in ('issued','void','refunded')"/>
+                    <button name="action_manual_register_payment" string="Manual Payment" type="object" class="btn-secondary" invisible="payment_status == 'paid'"/>
+                    <button name="action_manual_void" string="Void" type="object" class="btn-secondary" confirm="Void this ticket?" invisible="ticket_status in ('void','none')"/>
+                    <button name="action_manual_refund" string="Refund" type="object" class="btn-secondary" confirm="Register a refund for this booking?" invisible="ticket_status in ('void','refunded','none')"/>
+                    <button name="action_manual_exchange" string="Exchange / Reissue" type="object" class="btn-secondary" invisible="ticket_status in ('void','refunded','none')"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,searched,priced,pending_payment,booked,ticketed,confirmed"/>
                 </header>
                 <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_operations" type="object" class="oe_stat_button" icon="fa-history">
+                            <field name="operation_count" widget="statinfo" string="Operations"/>
+                        </button>
+                    </div>
                     <div class="oe_title">
                         <h1><field name="name" readonly="1"/></h1>
                     </div>
@@ -59,16 +76,37 @@
                             <field name="company_id" groups="base.group_multi_company"/>
                             <field name="booking_type"/>
                             <field name="booking_source"/>
+                            <field name="is_manual"/>
+                            <field name="source_system"/>
+                            <field name="booking_date"/>
+                        </group>
+                        <group string="Pricing">
+                            <field name="currency_id"/>
+                            <field name="base_fare"/>
+                            <field name="tax_amount"/>
+                            <field name="fee_amount"/>
+                            <field name="net_cost" readonly="1"/>
+                            <field name="net_amount"/>
+                            <field name="markup_amount"/>
+                            <field name="commission_amount"/>
+                            <field name="selling_price"/>
+                            <field name="total_amount" readonly="1"/>
+                            <field name="profit" readonly="1"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Payment">
                             <field name="payment_status"/>
                             <field name="payment_method"/>
                             <field name="payment_reference"/>
                         </group>
-                        <group string="Pricing">
-                            <field name="currency_id"/>
-                            <field name="net_amount"/>
-                            <field name="markup_amount"/>
-                            <field name="commission_amount"/>
-                            <field name="total_amount" readonly="1"/>
+                        <group string="Ticket Information">
+                            <field name="airline"/>
+                            <field name="flight_number"/>
+                            <field name="booking_reference"/>
+                            <field name="ticket_status"/>
+                            <field name="issue_date"/>
+                            <field name="travel_date"/>
                         </group>
                     </group>
                     <group string="Supplier References">
@@ -95,6 +133,9 @@
                                     <field name="passport_expiry"/>
                                     <field name="email"/>
                                     <field name="phone"/>
+                                    <field name="ticket_number"/>
+                                    <field name="seat_number"/>
+                                    <field name="is_lead"/>
                                 </list>
                             </field>
                         </page>
@@ -159,6 +200,23 @@
                                 </list>
                             </field>
                         </page>
+                        <page string="Operations">
+                            <field name="operation_ids" context="{'default_partner_id': partner_id, 'default_agent_id': agent_id, 'default_currency_id': currency_id}">
+                                <list editable="bottom">
+                                    <field name="name" readonly="1"/>
+                                    <field name="operation_date"/>
+                                    <field name="operation_type"/>
+                                    <field name="is_manual"/>
+                                    <field name="source_system"/>
+                                    <field name="amount"/>
+                                    <field name="currency_id" column_invisible="1"/>
+                                    <field name="payment_method"/>
+                                    <field name="payment_status"/>
+                                    <field name="payment_reference"/>
+                                    <field name="state"/>
+                                </list>
+                            </field>
+                        </page>
                         <page string="Notes">
                             <field name="internal_notes"/>
                         </page>
@@ -174,30 +232,82 @@
         <field name="model">trip.booking</field>
         <field name="arch" type="xml">
             <search string="Search Trip Bookings">
-                <field name="name"/>
-                <field name="partner_id"/>
-                <field name="agent_id"/>
+                <field name="name" string="Booking / Reference"
+                       filter_domain="['|', '|', '|', ('name', 'ilike', self), ('booking_reference', 'ilike', self), ('pnr', 'ilike', self), ('ticket_number', 'ilike', self)]"/>
+                <field name="passenger_names" string="Passenger Name"
+                       filter_domain="['|', ('partner_id.name', 'ilike', self), ('passenger_names', 'ilike', self)]"/>
+                <field name="passport_numbers" string="Passport Number" filter_domain="[('passport_numbers', 'ilike', self)]"/>
+                <field name="contact_phones" string="Phone" filter_domain="[('contact_phones', 'ilike', self)]"/>
+                <field name="contact_emails" string="Email" filter_domain="[('contact_emails', 'ilike', self)]"/>
                 <field name="pnr"/>
+                <field name="ticket_number"/>
+                <field name="airline"/>
+                <field name="flight_number"/>
+                <field name="agent_id"/>
+                <field name="partner_id" string="Customer"/>
+                <field name="invoice_number" string="Invoice Number"/>
+                <field name="payment_reference"/>
                 <field name="booking_type"/>
                 <field name="state"/>
+                <field name="ticket_status"/>
                 <field name="payment_status"/>
-                            <field name="payment_method"/>
-                            <field name="payment_reference"/>
                 <filter string="My Bookings" name="my_bookings" domain="[('agent_id', '=', uid)]"/>
+                <filter string="Manual Entries" name="manual" domain="[('is_manual', '=', True)]"/>
+                <filter string="Online / App" name="online" domain="[('is_manual', '=', False)]"/>
                 <filter string="Confirmed" name="confirmed" domain="[('state', 'in', ('confirmed','ticketed'))]"/>
                 <filter string="Pending Payment" name="pending_payment" domain="[('payment_status', '!=', 'paid')]"/>
+                <separator/>
+                <filter string="Issued" name="t_issued" domain="[('ticket_status', '=', 'issued')]"/>
+                <filter string="Pending Ticket" name="t_pending" domain="[('ticket_status', '=', 'pending')]"/>
+                <filter string="Void" name="t_void" domain="[('ticket_status', '=', 'void')]"/>
+                <filter string="Refund" name="t_refund" domain="[('ticket_status', '=', 'refunded')]"/>
+                <filter string="Exchange" name="t_exchange" domain="[('ticket_status', '=', 'exchanged')]"/>
                 <separator/>
                 <filter string="Flights" name="flights" domain="[('booking_type', '=', 'flight')]"/>
                 <filter string="Hotels" name="hotels" domain="[('booking_type', '=', 'hotel')]"/>
                 <filter string="Cars / Transfers" name="cars" domain="[('booking_type', '=', 'car')]"/>
+                <separator/>
+                <filter string="Booking Date" name="filter_booking_date" date="booking_date"/>
+                <filter string="Travel Date" name="filter_travel_date" date="travel_date"/>
                 <group expand="0" string="Group By">
                     <filter string="Status" name="group_state" context="{'group_by': 'state'}"/>
+                    <filter string="Ticket Status" name="group_ticket_status" context="{'group_by': 'ticket_status'}"/>
                     <filter string="Type" name="group_type" context="{'group_by': 'booking_type'}"/>
+                    <filter string="Source" name="group_source" context="{'group_by': 'source_system'}"/>
+                    <filter string="Airline" name="group_airline" context="{'group_by': 'airline'}"/>
                     <filter string="Agent" name="group_agent" context="{'group_by': 'agent_id'}"/>
                     <filter string="Customer" name="group_customer" context="{'group_by': 'partner_id'}"/>
+                    <filter string="Booking Date" name="group_booking_month" context="{'group_by': 'booking_date:month'}"/>
                     <filter string="Company" name="group_company" context="{'group_by': 'company_id'}" groups="base.group_multi_company"/>
                 </group>
             </search>
+        </field>
+    </record>
+
+    <record id="trip_booking_view_pivot" model="ir.ui.view">
+        <field name="name">trip.booking.pivot</field>
+        <field name="model">trip.booking</field>
+        <field name="arch" type="xml">
+            <pivot string="Bookings Analysis" sample="1">
+                <field name="booking_date" interval="month" type="row"/>
+                <field name="booking_type" type="col"/>
+                <field name="net_cost" type="measure"/>
+                <field name="total_amount" type="measure"/>
+                <field name="commission_amount" type="measure"/>
+                <field name="profit" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="trip_booking_view_graph" model="ir.ui.view">
+        <field name="name">trip.booking.graph</field>
+        <field name="model">trip.booking</field>
+        <field name="arch" type="xml">
+            <graph string="Bookings Analysis" type="bar" sample="1">
+                <field name="booking_date" interval="month"/>
+                <field name="total_amount" type="measure"/>
+                <field name="profit" type="measure"/>
+            </graph>
         </field>
     </record>
 

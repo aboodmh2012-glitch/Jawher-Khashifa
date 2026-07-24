@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="trip_operation_action" model="ir.actions.act_window">
+        <field name="name">Operations</field>
+        <field name="res_model">trip.operation</field>
+        <field name="view_mode">list,form,pivot,graph</field>
+        <field name="context">{'search_default_group_type': 1}</field>
+    </record>
+
+    <record id="trip_operation_manual_action" model="ir.actions.act_window">
+        <field name="name">Manual Operations</field>
+        <field name="res_model">trip.operation</field>
+        <field name="view_mode">list,form,pivot,graph</field>
+        <field name="domain">[('is_manual', '=', True)]</field>
+        <field name="context">{'default_is_manual': True}</field>
+    </record>
+
+    <record id="trip_operation_view_list" model="ir.ui.view">
+        <field name="name">trip.operation.list</field>
+        <field name="model">trip.operation</field>
+        <field name="arch" type="xml">
+            <list decoration-info="state == 'draft'" decoration-muted="state == 'cancelled'">
+                <field name="name"/>
+                <field name="operation_date"/>
+                <field name="operation_type"/>
+                <field name="is_manual"/>
+                <field name="source_system"/>
+                <field name="booking_id"/>
+                <field name="partner_id"/>
+                <field name="agent_id"/>
+                <field name="pnr" optional="show"/>
+                <field name="ticket_number" optional="show"/>
+                <field name="amount" sum="Amount"/>
+                <field name="currency_id" column_invisible="1"/>
+                <field name="payment_method" optional="hide"/>
+                <field name="payment_status"/>
+                <field name="payment_reference" optional="hide"/>
+                <field name="state"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="trip_operation_view_form" model="ir.ui.view">
+        <field name="name">trip.operation.form</field>
+        <field name="model">trip.operation</field>
+        <field name="arch" type="xml">
+            <form string="Trip Operation">
+                <header>
+                    <button name="action_confirm" string="Confirm" type="object" class="btn-primary" invisible="state != 'draft'"/>
+                    <button name="action_draft" string="Reset to Draft" type="object" invisible="state != 'cancelled'"/>
+                    <button name="action_cancel" string="Cancel" type="object" class="btn-danger" invisible="state == 'cancelled'"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,confirmed"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="operation_type"/>
+                            <field name="is_manual"/>
+                            <field name="source_system"/>
+                            <field name="operation_date"/>
+                            <field name="booking_id"/>
+                            <field name="booking_type"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                        <group>
+                            <field name="partner_id"/>
+                            <field name="agent_id"/>
+                            <field name="user_id"/>
+                            <field name="airline"/>
+                            <field name="pnr"/>
+                            <field name="ticket_number"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Financial">
+                            <field name="currency_id"/>
+                            <field name="amount"/>
+                            <field name="invoice_id"/>
+                        </group>
+                        <group string="Payment">
+                            <field name="payment_method"/>
+                            <field name="payment_status"/>
+                            <field name="payment_reference"/>
+                        </group>
+                    </group>
+                    <group string="Notes">
+                        <field name="description" nolabel="1"/>
+                    </group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="trip_operation_view_search" model="ir.ui.view">
+        <field name="name">trip.operation.search</field>
+        <field name="model">trip.operation</field>
+        <field name="arch" type="xml">
+            <search string="Search Operations">
+                <field name="name"/>
+                <field name="booking_id"/>
+                <field name="partner_id"/>
+                <field name="agent_id"/>
+                <field name="pnr"/>
+                <field name="ticket_number"/>
+                <field name="payment_reference"/>
+                <field name="operation_type"/>
+                <filter string="Manual" name="manual" domain="[('is_manual', '=', True)]"/>
+                <filter string="Online / App" name="online" domain="[('is_manual', '=', False)]"/>
+                <separator/>
+                <filter string="Bookings" name="f_booking" domain="[('operation_type', '=', 'booking')]"/>
+                <filter string="Ticket Issue" name="f_issue" domain="[('operation_type', '=', 'ticket_issue')]"/>
+                <filter string="Payments" name="f_payment" domain="[('operation_type', '=', 'payment')]"/>
+                <filter string="Void" name="f_void" domain="[('operation_type', '=', 'void')]"/>
+                <filter string="Refund" name="f_refund" domain="[('operation_type', '=', 'refund')]"/>
+                <filter string="Exchange" name="f_exchange" domain="[('operation_type', '=', 'exchange')]"/>
+                <separator/>
+                <filter string="Date" name="filter_date" date="operation_date"/>
+                <group expand="0" string="Group By">
+                    <filter string="Operation" name="group_type" context="{'group_by': 'operation_type'}"/>
+                    <filter string="Source" name="group_source" context="{'group_by': 'source_system'}"/>
+                    <filter string="Manual / Online" name="group_manual" context="{'group_by': 'is_manual'}"/>
+                    <filter string="Agent" name="group_agent" context="{'group_by': 'agent_id'}"/>
+                    <filter string="Customer" name="group_customer" context="{'group_by': 'partner_id'}"/>
+                    <filter string="Recorded By" name="group_user" context="{'group_by': 'user_id'}"/>
+                    <filter string="Date" name="group_month" context="{'group_by': 'operation_date:month'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="trip_operation_view_pivot" model="ir.ui.view">
+        <field name="name">trip.operation.pivot</field>
+        <field name="model">trip.operation</field>
+        <field name="arch" type="xml">
+            <pivot string="Operations Analysis" sample="1">
+                <field name="operation_date" interval="month" type="row"/>
+                <field name="operation_type" type="col"/>
+                <field name="amount" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="trip_operation_view_graph" model="ir.ui.view">
+        <field name="name">trip.operation.graph</field>
+        <field name="model">trip.operation</field>
+        <field name="arch" type="xml">
+            <graph string="Operations Analysis" type="bar" sample="1">
+                <field name="operation_type"/>
+                <field name="amount" type="measure"/>
+            </graph>
+        </field>
+    </record>
+</odoo>

@@ -1,7 +1,7 @@
 {
     'name': 'Trip Booking Platform',
     'summary': 'Flights, Hotels, Cars booking platform integrated with Odoo',
-    'version': '1.7.1',
+    'version': '1.8.0',
     'category': 'Travel',
     'author': 'Fusion',
     'depends': [
@@ -18,7 +18,10 @@
         'security/ir.model.access.csv',
         'data/sequence.xml',
         'data/email_templates.xml',
+        'report/trip_booking_report.xml',
         'views/trip_booking_views.xml',
+        'views/trip_operation_views.xml',
+        'views/trip_reports.xml',
         'views/trip_pricing_rule_views.xml',
         'views/trip_wallet_transaction_views.xml',
         'views/trip_api_log_views.xml',
