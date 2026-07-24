@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <record id="res_config_settings_view_form_fusion_travel" model="ir.ui.view">
+    <field name="name">res.config.settings.view.form.fusion.travel</field>
+    <field name="model">res.config.settings</field>
+    <field name="inherit_id" ref="base.res_config_settings_view_form"/>
+    <field name="arch" type="xml">
+      <xpath expr="//form" position="inside">
+        <app string="Fusion Travel" name="fusion_travel" groups="fusion_travel.group_fusion_travel_manager">
+          <block title="Travel Provider / Amadeus">
+            <setting string="Access mode"><field name="trip_amadeus_access_mode"/></setting>
+            <setting string="Environment"><field name="trip_amadeus_environment"/></setting>
+            <setting string="Provider base URL"><field name="trip_amadeus_base_url"/></setting>
+            <setting string="Client ID"><field name="trip_amadeus_client_id"/></setting>
+            <setting string="Client secret"><field name="trip_amadeus_client_secret" password="True"/></setting>
+            <setting string="Token URL"><field name="trip_amadeus_token_url"/></setting>
+            <setting string="Timeout"><field name="trip_amadeus_timeout"/></setting>
+            <setting string="Store full API payloads"><field name="trip_amadeus_debug_logging"/></setting>
+            <setting string="Queueing office ID"><field name="trip_amadeus_queuing_office_id"/></setting>
+            <setting string="Travel agent email"><field name="trip_travel_agent_email"/></setting>
+          </block>
+          <block title="Products and offers">
+            <setting string="Flight product"><field name="fusion_travel_flight_product_id"/></setting>
+            <setting string="Hotel product"><field name="fusion_travel_hotel_product_id"/></setting>
+            <setting string="Car / transfer product"><field name="fusion_travel_car_product_id"/></setting>
+            <setting string="Offer lifetime"><field name="fusion_travel_offer_ttl_minutes"/></setting>
+          </block>
+        </app>
+      </xpath>
+    </field>
+  </record>
+</odoo>

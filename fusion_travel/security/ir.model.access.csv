@@ -1,0 +1,28 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_booking_user,Travel booking user,model_fusion_travel_booking,fusion_travel.group_fusion_travel_user,1,1,1,0
+access_booking_manager,Travel booking manager,model_fusion_travel_booking,fusion_travel.group_fusion_travel_manager,1,1,1,1
+access_passenger_user,Travel passenger user,model_fusion_travel_passenger,fusion_travel.group_fusion_travel_user,1,1,1,0
+access_passenger_manager,Travel passenger manager,model_fusion_travel_passenger,fusion_travel.group_fusion_travel_manager,1,1,1,1
+access_segment_user,Travel segment user,model_fusion_travel_flight_segment,fusion_travel.group_fusion_travel_user,1,1,1,0
+access_segment_manager,Travel segment manager,model_fusion_travel_flight_segment,fusion_travel.group_fusion_travel_manager,1,1,1,1
+access_hotel_user,Travel hotel user,model_fusion_travel_hotel_stay,fusion_travel.group_fusion_travel_user,1,1,1,0
+access_hotel_manager,Travel hotel manager,model_fusion_travel_hotel_stay,fusion_travel.group_fusion_travel_manager,1,1,1,1
+access_car_user,Travel car user,model_fusion_travel_car_service,fusion_travel.group_fusion_travel_user,1,1,1,0
+access_car_manager,Travel car manager,model_fusion_travel_car_service,fusion_travel.group_fusion_travel_manager,1,1,1,1
+access_pricing_user,Travel pricing user,model_fusion_travel_pricing_rule,fusion_travel.group_fusion_travel_user,1,0,0,0
+access_pricing_manager,Travel pricing manager,model_fusion_travel_pricing_rule,fusion_travel.group_fusion_travel_manager,1,1,1,1
+access_wallet_user,Travel wallet user,model_fusion_travel_wallet_transaction,fusion_travel.group_fusion_travel_user,1,0,0,0
+access_wallet_accountant,Travel wallet accountant,model_fusion_travel_wallet_transaction,fusion_travel.group_fusion_travel_accountant,1,1,1,0
+access_wallet_manager,Travel wallet manager,model_fusion_travel_wallet_transaction,fusion_travel.group_fusion_travel_manager,1,1,1,1
+access_api_log_user,Travel API log user,model_fusion_travel_api_log,fusion_travel.group_fusion_travel_user,1,0,0,0
+access_api_log_manager,Travel API log manager,model_fusion_travel_api_log,fusion_travel.group_fusion_travel_manager,1,1,1,1
+access_airline_user,Airline user,model_fusion_travel_airline,fusion_travel.group_fusion_travel_user,1,0,0,0
+access_airline_manager,Airline manager,model_fusion_travel_airline,fusion_travel.group_fusion_travel_manager,1,1,1,1
+access_ticket_user,Flight ticket user,model_fusion_travel_flight_ticket,fusion_travel.group_fusion_travel_user,1,0,0,0
+access_ticket_accountant,Flight ticket accountant,model_fusion_travel_flight_ticket,fusion_travel.group_fusion_travel_accountant,1,1,1,0
+access_ticket_manager,Flight ticket manager,model_fusion_travel_flight_ticket,fusion_travel.group_fusion_travel_manager,1,1,1,1
+access_booking_portal,Travel booking portal,model_fusion_travel_booking,base.group_portal,1,0,0,0
+access_passenger_portal,Travel passenger portal,model_fusion_travel_passenger,base.group_portal,1,0,0,0
+access_segment_portal,Travel segment portal,model_fusion_travel_flight_segment,base.group_portal,1,0,0,0
+access_hotel_portal,Travel hotel portal,model_fusion_travel_hotel_stay,base.group_portal,1,0,0,0
+access_car_portal,Travel car portal,model_fusion_travel_car_service,base.group_portal,1,0,0,0

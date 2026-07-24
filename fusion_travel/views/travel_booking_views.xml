@@ -1,0 +1,205 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="trip_booking_action" model="ir.actions.act_window">
+        <field name="name">Trip Bookings</field>
+        <field name="res_model">fusion.travel.booking</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="trip_booking_view_list" model="ir.ui.view">
+        <field name="name">fusion.travel.booking.list</field>
+        <field name="model">fusion.travel.booking</field>
+        <field name="arch" type="xml">
+            <list decoration-success="state in ('confirmed','ticketed')" decoration-danger="state in ('failed','cancelled')">
+                <field name="name"/>
+                <field name="partner_id"/>
+                <field name="agent_id"/>
+                <field name="booking_type"/>
+                <field name="booking_source"/>
+                <field name="state"/>
+                <field name="payment_status" readonly="1"/>
+                            <field name="payment_method"/>
+                            <field name="payment_reference" readonly="1"/>
+                <field name="pnr" readonly="1"/>
+                <field name="total_amount"/>
+                <field name="currency_id"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="trip_booking_view_form" model="ir.ui.view">
+        <field name="name">fusion.travel.booking.form</field>
+        <field name="model">fusion.travel.booking</field>
+        <field name="arch" type="xml">
+            <form string="Trip Booking">
+                <header>
+                    <button name="action_mark_priced" string="Mark Priced" type="object" class="btn-secondary" invisible="state != 'draft'"/>
+                    <button name="action_apply_pricing_rule" string="Apply Pricing Rule" type="object" class="btn-secondary" invisible="state not in ('draft','searched','priced')"/>
+                    <button name="action_price_booking" string="Revalidate Price" type="object" class="btn-primary" invisible="state not in ('searched','draft')"/>
+                    <button name="action_pending_payment" string="Pending Payment" type="object" class="btn-secondary" invisible="state != 'priced'"/>
+                    <button name="action_create_sale_order" string="Create Sale Order" type="object" class="btn-secondary" invisible="sale_order_id"/>
+                    <button name="action_view_sale_order" string="View Sale Order" type="object" class="btn-secondary" invisible="not sale_order_id"/>
+                    <button name="action_create_invoice" string="Create Invoice" type="object" class="btn-primary" groups="fusion_travel.group_fusion_travel_accountant" invisible="invoice_id"/>
+                    <button name="action_view_invoice" string="View Invoice" type="object" class="btn-secondary" invisible="not invoice_id"/>
+                    <button name="action_mark_payment_received" string="Sync Paid Invoice" type="object" class="btn-primary" groups="fusion_travel.group_fusion_travel_accountant" invisible="payment_status == 'paid' or state not in ('priced','pending_payment')"/>
+                    <button name="action_create_provider_order" string="Create Supplier Order" type="object" class="btn-success" groups="fusion_travel.group_fusion_travel_accountant" invisible="payment_status != 'paid' or state not in ('priced','pending_payment')"/>
+                    <button name="action_confirm_booking" string="Confirm" type="object" class="btn-primary" groups="fusion_travel.group_fusion_travel_manager" invisible="state not in ('priced','pending_payment','booked')"/>
+                    <button name="action_mark_ticketed" string="Mark Ticketed" type="object" class="btn-primary" groups="fusion_travel.group_fusion_travel_accountant" invisible="state not in ('booked','confirmed')"/>
+                    <button name="action_cancel" string="Cancel" type="object" class="btn-danger" groups="fusion_travel.group_fusion_travel_manager" invisible="state in ('cancelled','ticketed')"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,searched,priced,pending_payment,booked,ticketed,confirmed"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="partner_id"/>
+                            <field name="agent_id"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                            <field name="booking_type"/>
+                            <field name="booking_source"/>
+                            <field name="payment_status" readonly="1"/>
+                            <field name="payment_method"/>
+                            <field name="payment_reference" readonly="1"/>
+                        </group>
+                        <group string="Pricing">
+                            <field name="currency_id"/>
+                            <field name="net_amount"/>
+                            <field name="markup_amount"/>
+                            <field name="commission_amount"/>
+                            <field name="total_amount" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Supplier References">
+                        <group>
+                            <field name="amadeus_reference" readonly="1"/>
+                            <field name="pnr" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="ticket_number" readonly="1"/>
+                            <field name="api_status" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Passengers">
+                            <field name="passenger_ids">
+                                <list editable="bottom">
+                                    <field name="passenger_type"/>
+                                    <field name="first_name"/>
+                                    <field name="last_name"/>
+                                    <field name="date_of_birth"/>
+                                    <field name="gender"/>
+                                    <field name="nationality_id"/>
+                                    <field name="passport_number"/>
+                                    <field name="passport_expiry"/>
+                                    <field name="email"/>
+                                    <field name="phone"/>
+                                    <field name="ticket_number" groups="fusion_travel.group_fusion_travel_accountant"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Flights">
+                            <field name="flight_segment_ids">
+                                <list editable="bottom">
+                                    <field name="airline_code"/>
+                                    <field name="flight_number"/>
+                                    <field name="origin_airport"/>
+                                    <field name="destination_airport"/>
+                                    <field name="departure_time"/>
+                                    <field name="arrival_time"/>
+                                    <field name="cabin_class"/>
+                                    <field name="fare_basis"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Hotel">
+                            <field name="hotel_stay_ids">
+                                <list editable="bottom">
+                                    <field name="hotel_name"/>
+                                    <field name="hotel_code"/>
+                                    <field name="city"/>
+                                    <field name="checkin_date"/>
+                                    <field name="checkout_date"/>
+                                    <field name="nights"/>
+                                    <field name="room_type"/>
+                                    <field name="total_amount"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Car / Transfer">
+                            <field name="car_rental_ids">
+                                <list editable="bottom">
+                                    <field name="provider"/>
+                                    <field name="vehicle_type"/>
+                                    <field name="pickup_location"/>
+                                    <field name="dropoff_location"/>
+                                    <field name="pickup_datetime"/>
+                                    <field name="dropoff_datetime"/>
+                                    <field name="total_amount"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Provider JSON" groups="fusion_travel.group_fusion_travel_manager">
+                            <group>
+                                <field name="selected_offer_json"/>
+                                <field name="priced_offer_json"/>
+                                <field name="booking_response_json"/>
+                            </group>
+                        </page>
+                        <page string="API Logs" groups="fusion_travel.group_fusion_travel_manager">
+                            <field name="api_log_ids" readonly="1">
+                                <list>
+                                    <field name="date"/>
+                                    <field name="api_name"/>
+                                    <field name="access_mode"/>
+                                    <field name="environment"/>
+                                    <field name="status"/>
+                                    <field name="http_status"/>
+                                    <field name="error_message"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Notes">
+                            <field name="internal_notes"/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="trip_booking_view_search" model="ir.ui.view">
+        <field name="name">fusion.travel.booking.search</field>
+        <field name="model">fusion.travel.booking</field>
+        <field name="arch" type="xml">
+            <search string="Search Trip Bookings">
+                <field name="name"/>
+                <field name="partner_id"/>
+                <field name="agent_id"/>
+                <field name="pnr" readonly="1"/>
+                <field name="booking_type"/>
+                <field name="state"/>
+                <field name="payment_status" readonly="1"/>
+                            <field name="payment_method"/>
+                            <field name="payment_reference" readonly="1"/>
+                <filter string="My Bookings" name="my_bookings" domain="[('agent_id', '=', uid)]"/>
+                <filter string="Confirmed" name="confirmed" domain="[('state', 'in', ('confirmed','ticketed'))]"/>
+                <filter string="Pending Payment" name="pending_payment" domain="[('payment_status', '!=', 'paid')]"/>
+                <separator/>
+                <filter string="Flights" name="flights" domain="[('booking_type', '=', 'flight')]"/>
+                <filter string="Hotels" name="hotels" domain="[('booking_type', '=', 'hotel')]"/>
+                <filter string="Cars / Transfers" name="cars" domain="[('booking_type', '=', 'car')]"/>
+                <group expand="0" string="Group By">
+                    <filter string="Status" name="group_state" context="{'group_by': 'state'}"/>
+                    <filter string="Type" name="group_type" context="{'group_by': 'booking_type'}"/>
+                    <filter string="Agent" name="group_agent" context="{'group_by': 'agent_id'}"/>
+                    <filter string="Customer" name="group_customer" context="{'group_by': 'partner_id'}"/>
+                    <filter string="Company" name="group_company" context="{'group_by': 'company_id'}" groups="base.group_multi_company"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+</odoo>

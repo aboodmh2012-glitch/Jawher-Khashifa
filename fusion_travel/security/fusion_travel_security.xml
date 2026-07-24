@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="module_category_fusion_travel" model="ir.module.category">
+        <field name="name">Fusion Travel</field>
+        <field name="sequence">35</field>
+    </record>
+    <record id="group_fusion_travel_user" model="res.groups">
+        <field name="name">Travel User</field>
+        <field name="category_id" ref="fusion_travel.module_category_fusion_travel"/>
+        <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+    </record>
+    <record id="group_fusion_travel_accountant" model="res.groups">
+        <field name="name">Travel Accountant</field>
+        <field name="category_id" ref="fusion_travel.module_category_fusion_travel"/>
+        <field name="implied_ids" eval="[(4, ref('fusion_travel.group_fusion_travel_user')), (4, ref('account.group_account_user'))]"/>
+    </record>
+    <record id="group_fusion_travel_manager" model="res.groups">
+        <field name="name">Travel Manager</field>
+        <field name="category_id" ref="fusion_travel.module_category_fusion_travel"/>
+        <field name="implied_ids" eval="[(4, ref('fusion_travel.group_fusion_travel_accountant'))]"/>
+    </record>
+
+    <record id="booking_user_rule" model="ir.rule">
+        <field name="name">Travel users: assigned bookings</field>
+        <field name="model_id" ref="model_fusion_travel_booking"/>
+        <field name="domain_force">['&amp;', ('company_id', 'in', company_ids), '|', ('agent_id', '=', user.id), ('create_uid', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('fusion_travel.group_fusion_travel_user'))]"/>
+    </record>
+    <record id="booking_manager_rule" model="ir.rule">
+        <field name="name">Travel managers: company bookings</field>
+        <field name="model_id" ref="model_fusion_travel_booking"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        <field name="groups" eval="[(4, ref('fusion_travel.group_fusion_travel_manager'))]"/>
+    </record>
+    <record id="booking_portal_rule" model="ir.rule">
+        <field name="name">Portal: own travel bookings</field>
+        <field name="model_id" ref="model_fusion_travel_booking"/>
+        <field name="domain_force">[('partner_id', '=', user.partner_id.id)]</field>
+        <field name="groups" eval="[(4, ref('base.group_portal'))]"/>
+        <field name="perm_read" eval="True"/><field name="perm_write" eval="False"/><field name="perm_create" eval="False"/><field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="ticket_company_rule" model="ir.rule">
+        <field name="name">Flight tickets by company</field>
+        <field name="model_id" ref="model_fusion_travel_flight_ticket"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        <field name="groups" eval="[(4, ref('fusion_travel.group_fusion_travel_user'))]"/>
+    </record>
+    <record id="airline_all_rule" model="ir.rule">
+        <field name="name">Airlines visible to travel users</field>
+        <field name="model_id" ref="model_fusion_travel_airline"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('fusion_travel.group_fusion_travel_user'))]"/>
+    </record>
+
+    <record id="child_user_rule" model="ir.rule">
+        <field name="name">Travel child records: assigned booking</field>
+        <field name="model_id" ref="model_fusion_travel_passenger"/>
+        <field name="domain_force">['&amp;', ('company_id', 'in', company_ids), '|', ('booking_id.agent_id', '=', user.id), ('booking_id.create_uid', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('fusion_travel.group_fusion_travel_user'))]"/>
+    </record>
+    <record id="segment_user_rule" model="ir.rule">
+        <field name="name">Travel segments: assigned booking</field>
+        <field name="model_id" ref="model_fusion_travel_flight_segment"/>
+        <field name="domain_force">['&amp;', ('company_id', 'in', company_ids), '|', ('booking_id.agent_id', '=', user.id), ('booking_id.create_uid', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('fusion_travel.group_fusion_travel_user'))]"/>
+    </record>
+    <record id="hotel_user_rule" model="ir.rule">
+        <field name="name">Hotel stays: assigned booking</field>
+        <field name="model_id" ref="model_fusion_travel_hotel_stay"/>
+        <field name="domain_force">['&amp;', ('company_id', 'in', company_ids), '|', ('booking_id.agent_id', '=', user.id), ('booking_id.create_uid', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('fusion_travel.group_fusion_travel_user'))]"/>
+    </record>
+    <record id="car_user_rule" model="ir.rule">
+        <field name="name">Car services: assigned booking</field>
+        <field name="model_id" ref="model_fusion_travel_car_service"/>
+        <field name="domain_force">['&amp;', ('company_id', 'in', company_ids), '|', ('booking_id.agent_id', '=', user.id), ('booking_id.create_uid', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('fusion_travel.group_fusion_travel_user'))]"/>
+    </record>
+    <record id="portal_passenger_rule" model="ir.rule">
+        <field name="name">Portal: passengers of own booking</field>
+        <field name="model_id" ref="model_fusion_travel_passenger"/>
+        <field name="domain_force">[('booking_id.partner_id', '=', user.partner_id.id)]</field>
+        <field name="groups" eval="[(4, ref('base.group_portal'))]"/>
+        <field name="perm_read" eval="True"/><field name="perm_write" eval="False"/><field name="perm_create" eval="False"/><field name="perm_unlink" eval="False"/>
+    </record>
+    <record id="portal_segment_rule" model="ir.rule">
+        <field name="name">Portal: segments of own booking</field>
+        <field name="model_id" ref="model_fusion_travel_flight_segment"/>
+        <field name="domain_force">[('booking_id.partner_id', '=', user.partner_id.id)]</field>
+        <field name="groups" eval="[(4, ref('base.group_portal'))]"/>
+        <field name="perm_read" eval="True"/><field name="perm_write" eval="False"/><field name="perm_create" eval="False"/><field name="perm_unlink" eval="False"/>
+    </record>
+    <record id="portal_hotel_rule" model="ir.rule">
+        <field name="name">Portal: hotel stays of own booking</field>
+        <field name="model_id" ref="model_fusion_travel_hotel_stay"/>
+        <field name="domain_force">[('booking_id.partner_id', '=', user.partner_id.id)]</field>
+        <field name="groups" eval="[(4, ref('base.group_portal'))]"/>
+        <field name="perm_read" eval="True"/><field name="perm_write" eval="False"/><field name="perm_create" eval="False"/><field name="perm_unlink" eval="False"/>
+    </record>
+    <record id="portal_car_rule" model="ir.rule">
+        <field name="name">Portal: car services of own booking</field>
+        <field name="model_id" ref="model_fusion_travel_car_service"/>
+        <field name="domain_force">[('booking_id.partner_id', '=', user.partner_id.id)]</field>
+        <field name="groups" eval="[(4, ref('base.group_portal'))]"/>
+        <field name="perm_read" eval="True"/><field name="perm_write" eval="False"/><field name="perm_create" eval="False"/><field name="perm_unlink" eval="False"/>
+    </record>
+    <record id="booking_accountant_rule" model="ir.rule">
+        <field name="name">Travel accountants: company bookings</field>
+        <field name="model_id" ref="model_fusion_travel_booking"/>
+        <field name="domain_force">[("company_id", "in", company_ids)]</field>
+        <field name="groups" eval="[(4, ref('fusion_travel.group_fusion_travel_accountant'))]"/>
+    </record>
+
+    <record id="child_accountant_rule" model="ir.rule">
+        <field name="name">Travel accountants: company passengers</field>
+        <field name="model_id" ref="model_fusion_travel_passenger"/>
+        <field name="domain_force">[("company_id", "in", company_ids)]</field>
+        <field name="groups" eval="[(4, ref('fusion_travel.group_fusion_travel_accountant'))]"/>
+    </record>
+    <record id="segment_accountant_rule" model="ir.rule">
+        <field name="name">Travel accountants: company segments</field>
+        <field name="model_id" ref="model_fusion_travel_flight_segment"/>
+        <field name="domain_force">[("company_id", "in", company_ids)]</field>
+        <field name="groups" eval="[(4, ref('fusion_travel.group_fusion_travel_accountant'))]"/>
+    </record>
+    <record id="hotel_accountant_rule" model="ir.rule">
+        <field name="name">Travel accountants: company hotel stays</field>
+        <field name="model_id" ref="model_fusion_travel_hotel_stay"/>
+        <field name="domain_force">[("company_id", "in", company_ids)]</field>
+        <field name="groups" eval="[(4, ref('fusion_travel.group_fusion_travel_accountant'))]"/>
+    </record>
+    <record id="car_accountant_rule" model="ir.rule">
+        <field name="name">Travel accountants: company vehicle services</field>
+        <field name="model_id" ref="model_fusion_travel_car_service"/>
+        <field name="domain_force">[("company_id", "in", company_ids)]</field>
+        <field name="groups" eval="[(4, ref('fusion_travel.group_fusion_travel_accountant'))]"/>
+    </record>
+
+    <record id="pricing_company_rule" model="ir.rule">
+        <field name="name">Travel pricing rules by company</field>
+        <field name="model_id" ref="model_fusion_travel_pricing_rule"/>
+        <field name="domain_force">[("company_id", "in", company_ids)]</field>
+        <field name="groups" eval="[(4, ref('fusion_travel.group_fusion_travel_user'))]"/>
+    </record>
+    <record id="wallet_user_rule" model="ir.rule">
+        <field name="name">Travel users: wallet transactions for assigned bookings</field>
+        <field name="model_id" ref="model_fusion_travel_wallet_transaction"/>
+        <field name="domain_force">[("company_id", "in", company_ids), ("booking_id.agent_id", "=", user.id)]</field>
+        <field name="groups" eval="[(4, ref('fusion_travel.group_fusion_travel_user'))]"/>
+    </record>
+    <record id="wallet_accountant_rule" model="ir.rule">
+        <field name="name">Travel accountants: company wallet transactions</field>
+        <field name="model_id" ref="model_fusion_travel_wallet_transaction"/>
+        <field name="domain_force">[("company_id", "in", company_ids)]</field>
+        <field name="groups" eval="[(4, ref('fusion_travel.group_fusion_travel_accountant'))]"/>
+    </record>
+    <record id="api_log_user_rule" model="ir.rule">
+        <field name="name">Travel users: own API logs</field>
+        <field name="model_id" ref="model_fusion_travel_api_log"/>
+        <field name="domain_force">[("company_id", "in", company_ids), ("user_id", "=", user.id)]</field>
+        <field name="groups" eval="[(4, ref('fusion_travel.group_fusion_travel_user'))]"/>
+    </record>
+    <record id="api_log_manager_rule" model="ir.rule">
+        <field name="name">Travel managers: company API logs</field>
+        <field name="model_id" ref="model_fusion_travel_api_log"/>
+        <field name="domain_force">[("company_id", "in", company_ids)]</field>
+        <field name="groups" eval="[(4, ref('fusion_travel.group_fusion_travel_manager'))]"/>
+    </record>
+
+</odoo>
