@@ -187,5 +187,15 @@
         <field name="perm_create" eval="False"/>
         <field name="perm_unlink" eval="False"/>
     </record>
+    <record id="trip_operation_portal_own_rule" model="ir.rule">
+        <field name="name">Portal users can read operations of own bookings</field>
+        <field name="model_id" ref="model_trip_operation"/>
+        <field name="domain_force">[('booking_id.partner_id', '=', user.partner_id.id)]</field>
+        <field name="groups" eval="[(4, ref('base.group_portal'))]"/>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
 
 </odoo>
