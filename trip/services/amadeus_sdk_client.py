@@ -48,7 +48,7 @@ class AmadeusSDKClient:
         # Keep this optional. Official Self-Service normally uses hostname only.
         # Some Enterprise/aggregator setups may supply a compatible base URL.
         kwargs['custom_app_id'] = 'odoo-trip'
-        kwargs['custom_app_version'] = '1.7.1'
+        kwargs['custom_app_version'] = '1.7.2'
         if self.base_url:
             # SDK expects a host/domain value here, not a full API path.
             kwargs['host'] = self.base_url.replace('https://', '').replace('http://', '').strip('/')

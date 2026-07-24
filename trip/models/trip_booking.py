@@ -373,6 +373,11 @@ class TripBooking(models.Model):
         for index, passenger in enumerate(self.passenger_ids, start=1):
             if not passenger.first_name or not passenger.last_name:
                 raise UserError(_('Passenger first and last names are required.'))
+            # Amadeus validates the traveler type against the date of birth, so
+            # a missing/placeholder DOB for a child or infant is rejected at
+            # Flight Create Orders. Require an accurate DOB for non-adults.
+            if passenger.passenger_type in ('child', 'infant') and not passenger.date_of_birth:
+                raise UserError(_('Date of birth is required for child and infant passengers.'))
             if passenger.passenger_type == 'adult':
                 adult_ids.append(str(index))
             elif passenger.passenger_type == 'infant':
@@ -609,6 +614,13 @@ class TripBooking(models.Model):
 
     def action_create_provider_order(self, payment_payload=None, allow_unpaid=False):
         for booking in self:
+            # Idempotency guard: a supplier order/PNR already exists for this
+            # booking. Re-creating it would produce a duplicate PNR/hotel/
+            # transfer order and a duplicate supplier charge. This can happen if
+            # the manual /issue route is hit after the wallet/card flow already
+            # booked the supplier.
+            if booking.amadeus_reference or booking.state in ('booked', 'ticketed', 'confirmed'):
+                continue
             if booking.payment_status != 'paid' and not allow_unpaid:
                 raise UserError(_('Confirm payment before creating the supplier order.'))
             if booking.booking_type == 'flight':

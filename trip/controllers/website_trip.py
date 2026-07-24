@@ -1,4 +1,6 @@
 import base64
+import hashlib
+import hmac
 import json
 import logging
 from datetime import date, datetime, timedelta
@@ -100,13 +102,29 @@ class TripWebsiteController(http.Controller):
             'max': 10,
         }
 
+    def _offer_secret(self):
+        # Per-database secret used to sign offer payloads. This value never
+        # leaves the server and is unique per Odoo database.
+        return (request.env['ir.config_parameter'].sudo().get_param('database.secret') or '').encode('utf-8')
+
+    def _sign_offer_body(self, body):
+        return hmac.new(self._offer_secret(), body.encode('ascii'), hashlib.sha256).hexdigest()
+
     def _encode_offer_payload(self, offer):
+        # The offer (including its price) round-trips through the browser as a
+        # hidden field. Sign it with a server-side HMAC so a client cannot
+        # tamper with the price/offer id. This matters especially for transfers,
+        # whose price is not re-validated against the provider before payment.
         raw = json.dumps(offer, ensure_ascii=False, default=str).encode('utf-8')
-        return base64.urlsafe_b64encode(raw).decode('ascii')
+        body = base64.urlsafe_b64encode(raw).decode('ascii')
+        return '%s.%s' % (body, self._sign_offer_body(body))
 
     def _decode_offer_payload(self, payload):
         try:
-            raw = base64.urlsafe_b64decode((payload or '').encode('ascii'))
+            body, signature = (payload or '').rsplit('.', 1)
+            if not hmac.compare_digest(signature, self._sign_offer_body(body)):
+                raise ValueError('Offer payload signature mismatch.')
+            raw = base64.urlsafe_b64decode(body.encode('ascii'))
             data = json.loads(raw.decode('utf-8'))
         except Exception as exc:  # noqa: BLE001
             raise ValidationError(_('Invalid selected offer. Please search again.')) from exc

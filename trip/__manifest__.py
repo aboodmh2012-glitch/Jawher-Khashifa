@@ -1,7 +1,7 @@
 {
     'name': 'Trip Booking Platform',
     'summary': 'Flights, Hotels, Cars booking platform integrated with Odoo',
-    'version': '1.7.1',
+    'version': '1.7.2',
     'category': 'Travel',
     'author': 'Fusion',
     'depends': [
