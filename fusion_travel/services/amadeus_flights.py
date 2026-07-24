@@ -2,20 +2,12 @@ from .amadeus_sdk_client import AmadeusSDKClient
 
 
 class AmadeusFlights:
-    """Flight APIs implemented through the official Amadeus Python SDK."""
+    """Flight APIs implemented through documented Amadeus REST endpoints."""
 
     def __init__(self, env):
-        self.sdk = AmadeusSDKClient(env)
-
-    def _client(self):
-        return self.sdk.get_client()
+        self.api = AmadeusSDKClient(env)
 
     def search_offers(self, vals):
-        """Search flight offers using Flight Offers Search.
-
-        Maps to: GET /v2/shopping/flight-offers
-        SDK: amadeus.shopping.flight_offers_search.get(...)
-        """
         if not isinstance(vals, dict):
             raise ValueError('Search values must be a dictionary.')
         params = {
@@ -36,129 +28,108 @@ class AmadeusFlights:
             'excluded_airline_codes': 'excludedAirlineCodes',
             'max_price': 'maxPrice',
         }
-        for src, dst in optional_map.items():
-            if vals.get(src) not in (None, '', False):
-                params[dst] = vals.get(src)
-        params = {key: value for key, value in params.items() if value not in (None, '', False)}
-        client = self._client()
-        return self.sdk.call(
+        for source, destination in optional_map.items():
+            if vals.get(source) not in (None, '', False):
+                params[destination] = vals.get(source)
+        params = {
+            key: value for key, value in params.items()
+            if value not in (None, '', False)
+        }
+        return self.api.get(
             'Flight Offers Search',
-            client.shopping.flight_offers_search,
-            'get',
-            request_payload=params,
-            **params,
+            '/v2/shopping/flight-offers',
+            params=params,
         )
 
-    def price_offer(self, flight_offer, booking=None, include=None, payment=None):
-        """Confirm availability/final price for one raw flight-offer object.
-
-        Maps to: POST /v1/shopping/flight-offers/pricing
-        Official SDK usage: amadeus.shopping.flight_offers.pricing.post(flight_offer, **params).
-        The SDK wraps this into {'data': {'type': 'flight-offers-pricing', 'flightOffers': [...]}}.
-
-        Raw card/payment data is intentionally not passed here. Use a hosted or
-        tokenized provider flow outside this module when card charging is enabled.
-        """
+    def price_offer(self, flight_offer, booking=None, include=None):
         if not isinstance(flight_offer, dict) or flight_offer.get('type') != 'flight-offer':
-            raise ValueError('Flight Offers Price expects one raw flight-offer object returned by Flight Offers Search.')
-        client = self._client()
-        kwargs = {}
-        if include:
-            kwargs['include'] = include
-        request_payload = {'flight_offer': flight_offer, **kwargs}
-        return self.sdk.call(
+            raise ValueError(
+                'Flight Offers Price expects one raw flight-offer object returned by Flight Offers Search.'
+            )
+        body = {
+            'data': {
+                'type': 'flight-offers-pricing',
+                'flightOffers': [flight_offer],
+            }
+        }
+        params = {'include': include} if include else None
+        return self.api.post(
             'Flight Offers Price',
-            client.shopping.flight_offers.pricing,
-            'post',
-            flight_offer,
+            '/v1/shopping/flight-offers/pricing',
+            body,
+            params=params,
             booking=booking,
-            request_payload=request_payload,
-            **kwargs,
+            request_payload={'flightOfferId': flight_offer.get('id'), 'include': include},
         )
 
-    def create_order(self, flight_offer, travelers, booking=None, remarks=None, ticketing_agreement=None, contacts=None, queuing_office_id=None):
-        """Create an Amadeus flight order/PNR from a priced offer and travelers.
-
-        Maps to: POST /v1/booking/flight-orders
-        SDK: amadeus.booking.flight_orders.post(flight, travelers)
-
-        The official SDK method accepts flight + travelers. For extra Enterprise
-        fields such as queuingOfficeId, remarks, contacts, or ticketingAgreement,
-        use an Enterprise/aggregator adapter if your contract requires them.
-        """
+    def create_order(
+        self,
+        flight_offer,
+        travelers,
+        booking=None,
+        remarks=None,
+        ticketing_agreement=None,
+        contacts=None,
+        queuing_office_id=None,
+    ):
         if not isinstance(flight_offer, dict) or flight_offer.get('type') != 'flight-offer':
             raise ValueError('Flight Create Orders expects one priced flight-offer object.')
         if not travelers:
             raise ValueError('Flight Create Orders requires at least one traveler.')
-        client = self._client()
-        request_payload = {
-            'flight': flight_offer,
+        data = {
+            'type': 'flight-order',
+            'flightOffers': [flight_offer],
             'travelers': travelers,
-            'remarks': remarks,
-            'ticketingAgreement': ticketing_agreement,
-            'contacts': contacts,
-            'queuingOfficeId': queuing_office_id,
         }
-        return self.sdk.call(
+        if remarks:
+            data['remarks'] = remarks
+        if ticketing_agreement:
+            data['ticketingAgreement'] = ticketing_agreement
+        if contacts:
+            data['contacts'] = contacts
+        if queuing_office_id:
+            data['queuingOfficeId'] = queuing_office_id
+        body = {'data': data}
+        return self.api.post(
             'Flight Create Orders',
-            client.booking.flight_orders,
-            'post',
+            '/v1/booking/flight-orders',
+            body,
             booking=booking,
-            request_payload={k: v for k, v in request_payload.items() if v not in (None, '', False)},
-            flight=flight_offer,
-            travelers=travelers,
+            request_payload={
+                'flightOfferId': flight_offer.get('id'),
+                'travelerCount': len(travelers),
+                'queuingOfficeId': queuing_office_id,
+            },
         )
 
-    def search_airports_and_cities(self, keyword, sub_type='AIRPORT,CITY', page_limit=10):
-        """Autocomplete airports/cities.
-
-        Maps to: GET /v1/reference-data/locations
-        SDK: amadeus.reference_data.locations.get(...)
-        """
-        client = self._client()
+    def search_airports_and_cities(
+        self, keyword, sub_type='AIRPORT,CITY', page_limit=10
+    ):
         params = {
             'keyword': keyword,
             'subType': sub_type,
             'page[limit]': page_limit,
         }
-        return self.sdk.call(
+        return self.api.get(
             'Airport & City Search',
-            client.reference_data.locations,
-            'get',
-            request_payload=params,
-            **params,
+            '/v1/reference-data/locations',
+            params=params,
         )
 
     def get_checkin_links(self, airline_code):
-        """Return airline check-in links.
-
-        Maps to: GET /v2/reference-data/urls/checkin-links
-        SDK: amadeus.reference_data.urls.checkin_links.get(...)
-        """
-        client = self._client()
-        params = {'airlineCode': airline_code}
-        return self.sdk.call(
+        return self.api.get(
             'Flight Check-in Links',
-            client.reference_data.urls.checkin_links,
-            'get',
-            request_payload=params,
-            **params,
+            '/v2/reference-data/urls/checkin-links',
+            params={'airlineCode': airline_code},
         )
 
     def get_seatmaps(self, flight_offer):
-        """Return seat maps for a flight offer when available.
-
-        Maps to: POST /v1/shopping/seatmaps
-        SDK resource mapping may vary by SDK version, so this is isolated here.
-        """
         if not isinstance(flight_offer, dict) or flight_offer.get('type') != 'flight-offer':
             raise ValueError('SeatMap Display expects one flight-offer object.')
-        client = self._client()
         body = {'data': [flight_offer]}
-        return self.sdk.call(
+        return self.api.post(
             'SeatMap Display',
-            client.shopping.seatmaps,
-            'post',
+            '/v1/shopping/seatmaps',
             body,
-            request_payload=body,
+            request_payload={'flightOfferId': flight_offer.get('id')},
         )

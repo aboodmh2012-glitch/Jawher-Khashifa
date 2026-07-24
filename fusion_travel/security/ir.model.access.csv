@@ -14,8 +14,7 @@ access_pricing_manager,Travel pricing manager,model_fusion_travel_pricing_rule,f
 access_wallet_user,Travel wallet user,model_fusion_travel_wallet_transaction,fusion_travel.group_fusion_travel_user,1,0,0,0
 access_wallet_accountant,Travel wallet accountant,model_fusion_travel_wallet_transaction,fusion_travel.group_fusion_travel_accountant,1,1,1,0
 access_wallet_manager,Travel wallet manager,model_fusion_travel_wallet_transaction,fusion_travel.group_fusion_travel_manager,1,1,1,1
-access_api_log_user,Travel API log user,model_fusion_travel_api_log,fusion_travel.group_fusion_travel_user,1,0,0,0
-access_api_log_manager,Travel API log manager,model_fusion_travel_api_log,fusion_travel.group_fusion_travel_manager,1,1,1,1
+access_api_log_manager,Travel API log manager,model_fusion_travel_api_log,fusion_travel.group_fusion_travel_manager,1,0,0,0
 access_airline_user,Airline user,model_fusion_travel_airline,fusion_travel.group_fusion_travel_user,1,0,0,0
 access_airline_manager,Airline manager,model_fusion_travel_airline,fusion_travel.group_fusion_travel_manager,1,1,1,1
 access_ticket_user,Flight ticket user,model_fusion_travel_flight_ticket,fusion_travel.group_fusion_travel_user,1,0,0,0
@@ -26,3 +25,9 @@ access_passenger_portal,Travel passenger portal,model_fusion_travel_passenger,ba
 access_segment_portal,Travel segment portal,model_fusion_travel_flight_segment,base.group_portal,1,0,0,0
 access_hotel_portal,Travel hotel portal,model_fusion_travel_hotel_stay,base.group_portal,1,0,0,0
 access_car_portal,Travel car portal,model_fusion_travel_car_service,base.group_portal,1,0,0,0
+access_ticket_portal,Flight ticket portal,model_fusion_travel_flight_ticket,base.group_portal,1,0,0,0
+access_search_session_manager,Travel search session manager,model_fusion_travel_search_session,fusion_travel.group_fusion_travel_manager,1,1,1,1
+access_offer_manager,Travel offer manager,model_fusion_travel_offer,fusion_travel.group_fusion_travel_manager,1,1,1,1
+access_flight_ticket_manager,Legacy flight ticket manager,model_fusion_travel_flight_ticket,fusion_travel.group_fusion_travel_manager,1,1,1,1
+access_flight_ticket_accountant,Legacy flight ticket accountant,model_fusion_travel_flight_ticket,fusion_travel.group_fusion_travel_accountant,1,1,1,0
+access_fusion_travel_airline_user,Legacy airline user,model_fusion_travel_airline,fusion_travel.group_fusion_travel_user,1,0,0,0

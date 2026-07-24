@@ -1,4 +1,5 @@
-from odoo import fields, models
+from odoo import api, fields, models, _
+from odoo.exceptions import AccessError
 
 
 class TripApiLog(models.Model):
@@ -23,3 +24,20 @@ class TripApiLog(models.Model):
     error_message = fields.Text(readonly=True)
     booking_id = fields.Many2one('fusion.travel.booking')
     user_id = fields.Many2one('res.users', default=lambda self: self.env.user)
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        if not self.env.su:
+            raise AccessError(_('API logs can only be created by the provider integration.'))
+        return super().create(vals_list)
+
+    def write(self, vals):
+        if not self.env.su:
+            raise AccessError(_('API logs are immutable.'))
+        return super().write(vals)
+
+    def unlink(self):
+        if not self.env.su:
+            raise AccessError(_('API logs are immutable.'))
+        return super().unlink()
+

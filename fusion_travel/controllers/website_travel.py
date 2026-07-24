@@ -22,29 +22,24 @@ class FusionTravelWebsiteController(http.Controller):
     def flights_page(self, **kwargs):
         return request.render('fusion_travel.flights_search_template', {})
 
-    def _rate_limit_key(self):
-        ip = request.httprequest.headers.get('X-Forwarded-For', request.httprequest.remote_addr or 'unknown')
-        return f'fusion_travel.flight_search_rate.{ip.split(",")[0].strip()}'
-
     def _check_rate_limit(self, limit=20, window_minutes=10):
-        config = request.env['ir.config_parameter'].sudo()
-        key = self._rate_limit_key()
+        # Keep a short per-browser window in the Odoo HTTP session.  Do not use
+        # untrusted X-Forwarded-For values as ir.config_parameter keys: that
+        # would allow spoofed headers to create unbounded persistent settings.
         now = datetime.utcnow()
-        raw_value = config.get_param(key, '')
+        key = "fusion_travel_search_timestamps"
         stamps = []
-        for item in raw_value.split(','):
-            if not item:
-                continue
+        for value in request.session.get(key, []):
             try:
-                stamp = datetime.fromisoformat(item)
-            except ValueError:
+                stamp = datetime.fromisoformat(value)
+            except (TypeError, ValueError):
                 continue
             if now - stamp < timedelta(minutes=window_minutes):
                 stamps.append(stamp)
         if len(stamps) >= limit:
-            raise UserError(_('Too many flight searches. Please wait a few minutes and try again.'))
+            raise UserError(_("Too many travel searches. Please wait a few minutes and try again."))
         stamps.append(now)
-        config.set_param(key, ','.join(stamp.isoformat() for stamp in stamps[-limit:]))
+        request.session[key] = [stamp.isoformat() for stamp in stamps[-limit:]]
 
     def _safe_int(self, value, default=0):
         try:
@@ -60,9 +55,13 @@ class FusionTravelWebsiteController(http.Controller):
 
     def _create_search_session(self, service_type, values):
         partner = request.env.user.partner_id if not request.env.user._is_public() else False
-        return request.env["fusion.travel.search.session"].create_from_values(
+        session = request.env["fusion.travel.search.session"]._create_from_values(
             service_type, values, partner=partner
         )
+        browser_tokens = list(request.session.get('fusion_travel_search_sessions', []))
+        browser_tokens.append(session.token)
+        request.session['fusion_travel_search_sessions'] = browser_tokens[-10:]
+        return session
 
     def _store_offer(self, session, offer, amount=0.0, currency_name=False):
         currency = False
@@ -70,7 +69,7 @@ class FusionTravelWebsiteController(http.Controller):
             currency = request.env["res.currency"].sudo().search(
                 [("name", "=", currency_name)], limit=1
             )
-        return request.env["fusion.travel.offer"].store_offer(
+        return request.env["fusion.travel.offer"]._store_offer(
             session, offer, amount=amount, currency=currency
         )
 
@@ -81,10 +80,19 @@ class FusionTravelWebsiteController(http.Controller):
         record = request.env["fusion.travel.offer"].sudo().search([
             ("token", "=", token),
             ("service_type", "=", service_type),
+            ("company_id", "=", request.env.company.id),
         ], limit=1)
         if not record:
             raise ValidationError(_("Selected offer is no longer available. Please search again."))
-        return record, record.read_offer(consume=True)
+        session_partner = record.session_id.partner_id
+        if session_partner and session_partner != request.env.user.partner_id:
+            raise ValidationError(_("This provider offer belongs to another user session."))
+        if not session_partner:
+            browser_tokens = request.session.get('fusion_travel_search_sessions', [])
+            if record.session_id.token not in browser_tokens:
+                raise ValidationError(_("This provider offer belongs to another browser session."))
+        record.session_id._get_search_values()
+        return record, record._read_offer(consume=True)
 
     def _validate_search(self, post):
         origin = (post.get('origin') or '').strip().upper()
@@ -99,7 +107,14 @@ class FusionTravelWebsiteController(http.Controller):
             raise ValidationError(_('Enter a valid departure date.')) from exc
         if departure_date < date.today():
             raise ValidationError(_('Departure date cannot be in the past.'))
-        return_date = post.get('return_date') or False
+        trip_type = (post.get('trip_type') or 'round').strip().lower()
+        if trip_type == 'multi':
+            raise ValidationError(_('Multi-city search is not enabled yet. Use round trip or one way.'))
+        if trip_type not in ('round', 'oneway'):
+            raise ValidationError(_('Select a valid trip type.'))
+        return_date = False if trip_type == 'oneway' else (post.get('return_date') or False)
+        if trip_type == 'round' and not return_date:
+            raise ValidationError(_('A return date is required for a round trip.'))
         if return_date:
             try:
                 parsed_return = datetime.strptime(return_date, '%Y-%m-%d').date()
@@ -107,6 +122,9 @@ class FusionTravelWebsiteController(http.Controller):
                 raise ValidationError(_('Enter a valid return date.')) from exc
             if parsed_return < departure_date:
                 raise ValidationError(_('Return date cannot be before departure date.'))
+        travel_class = (post.get('travel_class') or 'ECONOMY').strip().upper()
+        if travel_class not in ('ECONOMY', 'PREMIUM_ECONOMY', 'BUSINESS', 'FIRST'):
+            raise ValidationError(_('Select a valid travel class.'))
         adults = max(self._safe_int(post.get('adults'), 1), 1)
         children = max(self._safe_int(post.get('children'), 0), 0)
         infants = max(self._safe_int(post.get('infants'), 0), 0)
@@ -115,6 +133,7 @@ class FusionTravelWebsiteController(http.Controller):
         if adults + children + infants > 9:
             raise ValidationError(_('A maximum of 9 passengers is allowed per search.'))
         return {
+            'trip_type': trip_type,
             'origin': origin,
             'destination': destination,
             'departure_date': departure_date.isoformat(),
@@ -122,7 +141,8 @@ class FusionTravelWebsiteController(http.Controller):
             'adults': adults,
             'children': children,
             'infants': infants,
-            'travel_class': post.get('travel_class') or False,
+            'travel_class': travel_class,
+            'non_stop': bool(post.get('non_stop')),
             'currency': (post.get('currency') or request.env.company.currency_id.name or 'USD').upper(),
             'max': 10,
         }
@@ -217,7 +237,7 @@ class FusionTravelWebsiteController(http.Controller):
                     'offer_token': stored_offer.token,
                 })
                 booking._load_flight_segments_from_offer(offer)
-                booking.action_apply_pricing_rule()
+                booking._apply_pricing_rule()
                 return request.redirect(f'/travel/booking/{booking.id}/passengers')
         except (UserError, ValidationError) as exc:
             _logger.info('Flight offer selection failed: %s', exc)
@@ -238,13 +258,18 @@ class FusionTravelWebsiteController(http.Controller):
                 'traveler_types': traveler_types,
                 'error': kwargs.get('error'),
             })
-        except Exception as exc:  # noqa: BLE001
-            return request.render('fusion_travel.trip_booking_error_template', {'error': str(exc)})
+        except Exception:  # noqa: BLE001
+            _logger.exception('Passenger page failed')
+            return request.render('fusion_travel.trip_booking_error_template', {
+                'error': _('Passenger details could not be loaded. Please contact support.')
+            })
 
     @http.route('/travel/booking/<int:booking_id>/passengers', type='http', auth='user', website=True, methods=['POST'], csrf=True)
     def booking_passengers_submit(self, booking_id, **post):
         try:
             booking = self._get_user_booking(booking_id)
+            if booking.payment_status == 'paid' or booking.state in ('booked', 'ticketed', 'confirmed', 'cancelled'):
+                raise ValidationError(_('Traveler details can no longer be changed for this booking.'))
             traveler_types = self._traveler_types_for_booking(booking)
             commands = [(5, 0, 0)]
             for index, passenger_type in enumerate(traveler_types):
@@ -286,8 +311,12 @@ class FusionTravelWebsiteController(http.Controller):
     def booking_confirm_price(self, booking_id, **post):
         try:
             booking = self._get_user_booking(booking_id)
+            if booking.payment_status == 'paid' or booking.state in ('booked', 'ticketed', 'confirmed'):
+                return request.redirect(f'/my/travel/booking/{booking.id}')
+            if booking.state not in ('searched', 'priced'):
+                raise ValidationError(_('This booking is not available for price confirmation.'))
             if request.httprequest.method == 'POST':
-                booking.sudo().action_price_booking()
+                booking.sudo()._website_price_booking(request.env.user.partner_id.id)
                 return request.redirect(f'/travel/booking/{booking.id}/payment')
             return request.render('fusion_travel.trip_price_confirmation_template', {'booking': booking, 'error': False})
         except (UserError, ValidationError) as exc:
@@ -306,26 +335,25 @@ class FusionTravelWebsiteController(http.Controller):
     def booking_payment(self, booking_id, **post):
         try:
             booking = self._get_user_booking(booking_id)
+            if booking.payment_status == 'paid' or booking.state in ('booked', 'ticketed', 'confirmed'):
+                return request.redirect(f'/my/travel/booking/{booking.id}')
+            if booking.provider_order_status in ('processing', 'created', 'needs_review'):
+                raise ValidationError(_('This booking is already processing or requires support review.'))
+            if booking.state not in ('priced', 'pending_payment'):
+                raise ValidationError(_('Revalidate the booking before payment.'))
+
             if request.httprequest.method == 'POST':
-                # Idempotency guard: a resubmit (double click / back button) on an
-                # already paid or booked booking must not re-price or re-charge it.
-                if booking.payment_status == 'paid' or booking.state in ('booked', 'ticketed', 'confirmed'):
-                    return request.redirect(f'/my/travel/booking/{booking.id}')
-
-                if booking.state not in ('priced', 'pending_payment'):
-                    booking.sudo().action_price_booking()
-
                 payment_method = post.get('payment_method') or 'amadeus_card'
                 if payment_method not in ('amadeus_card', 'wallet'):
                     raise ValidationError(_('Invalid payment method.'))
 
                 if payment_method == 'wallet':
-                    booking.sudo().action_pay_from_wallet_and_issue()
+                    booking.sudo()._website_pay_from_wallet_and_issue(request.env.user.partner_id.id)
                     return request.redirect(f'/my/travel/booking/{booking.id}')
 
                 # External provider-card flow: never collect raw card data in Odoo.
                 # Use a hosted payment page/tokenized Enterprise/NDC adapter when card charging is enabled.
-                booking.sudo().action_book_with_amadeus_card()
+                booking.sudo()._website_start_hosted_card_payment(request.env.user.partner_id.id)
                 return request.redirect(f'/my/travel/booking/{booking.id}')
 
             return request.render('fusion_travel.trip_payment_template', {'booking': booking, 'error': False})
@@ -342,10 +370,16 @@ class FusionTravelWebsiteController(http.Controller):
     def booking_issue(self, booking_id, **post):
         try:
             booking = self._get_user_booking(booking_id)
+            if booking.amadeus_reference or booking.provider_order_status == 'created':
+                return request.redirect(f'/my/travel/booking/{booking.id}')
+            if booking.provider_order_status in ('processing', 'needs_review'):
+                raise ValidationError(_('The provider order is processing or requires manual review.'))
             if request.httprequest.method == 'POST':
                 if booking.payment_status != 'paid':
                     raise ValidationError(_('Payment must be confirmed before creating the supplier order.'))
-                booking.sudo().action_create_provider_order()
+                if booking.state not in ('priced', 'pending_payment', 'failed'):
+                    raise ValidationError(_('This booking is not ready for supplier order creation.'))
+                booking.sudo()._website_create_provider_order(request.env.user.partner_id.id)
                 return request.redirect(f'/my/travel/booking/{booking.id}')
             return request.render('fusion_travel.trip_issue_template', {'booking': booking, 'error': False})
         except (UserError, ValidationError) as exc:
@@ -447,7 +481,7 @@ class FusionTravelWebsiteController(http.Controller):
                     'offer_token': stored_offer.token,
                 })
                 booking._load_hotel_stay_from_offer(hotel_info, offer)
-                booking.action_apply_pricing_rule()
+                booking._apply_pricing_rule()
                 return request.redirect(f'/travel/booking/{booking.id}/passengers')
         except (UserError, ValidationError) as exc:
             _logger.info('Hotel offer selection failed: %s', exc)
@@ -544,7 +578,7 @@ class FusionTravelWebsiteController(http.Controller):
                     'offer_token': stored_offer.token,
                 })
                 booking._load_car_rental_from_offer(offer)
-                booking.action_apply_pricing_rule()
+                booking._apply_pricing_rule()
                 return request.redirect(f'/travel/booking/{booking.id}/passengers')
         except (UserError, ValidationError) as exc:
             _logger.info('Transfer offer selection failed: %s', exc)

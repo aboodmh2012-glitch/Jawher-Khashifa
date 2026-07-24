@@ -13,20 +13,38 @@
             <setting string="Provider base URL"><field name="trip_amadeus_base_url"/></setting>
             <setting string="Client ID"><field name="trip_amadeus_client_id"/></setting>
             <setting string="Client secret"><field name="trip_amadeus_client_secret" password="True"/></setting>
-            <setting string="Token URL"><field name="trip_amadeus_token_url"/></setting>
-            <setting string="Timeout"><field name="trip_amadeus_timeout"/></setting>
+            <setting string="OAuth token URL override"><field name="trip_amadeus_token_url"/></setting>
+            <setting string="Provider API timeout" help="Applied to OAuth and provider REST requests; constrained to 5–180 seconds."><field name="trip_amadeus_timeout"/></setting>
             <setting string="Store full API payloads"><field name="trip_amadeus_debug_logging"/></setting>
-            <setting string="Queueing office ID"><field name="trip_amadeus_queuing_office_id"/></setting>
+            <setting string="Enable hosted card adapter" help="Do not enable until a PCI-compliant payment adapter and signed callback have been installed and tested."><field name="trip_hosted_card_adapter_enabled"/></setting>
+            <setting string="Consolidator queueing office ID"><field name="trip_amadeus_queuing_office_id"/></setting>
             <setting string="Travel agent email"><field name="trip_travel_agent_email"/></setting>
           </block>
           <block title="Products and offers">
             <setting string="Flight product"><field name="fusion_travel_flight_product_id"/></setting>
+            <setting string="Ticket accounting product"><field name="ticket_product_id"/></setting>
+            <setting string="Default travel provider"><field name="fusion_travel_default_provider_id"/></setting>
             <setting string="Hotel product"><field name="fusion_travel_hotel_product_id"/></setting>
             <setting string="Car / transfer product"><field name="fusion_travel_car_product_id"/></setting>
             <setting string="Offer lifetime"><field name="fusion_travel_offer_ttl_minutes"/></setting>
           </block>
+          <block title="Wallet accounting">
+            <setting string="Wallet settlement journal" help="General journal used to settle customer invoices from wallet balances.">
+              <field name="fusion_travel_wallet_journal_id"/>
+            </setting>
+            <setting string="Customer wallet liability account" help="Current-liability account credited by wallet funding entries and debited when customers spend wallet funds.">
+              <field name="fusion_travel_wallet_liability_account_id"/>
+            </setting>
+          </block>
         </app>
       </xpath>
     </field>
+  </record>
+  <record id="action_fusion_travel_res_config_settings" model="ir.actions.act_window">
+    <field name="name">Fusion Travel Settings</field>
+    <field name="res_model">res.config.settings</field>
+    <field name="view_mode">form</field>
+    <field name="target">current</field>
+    <field name="context">{'module': 'fusion_travel'}</field>
   </record>
 </odoo>

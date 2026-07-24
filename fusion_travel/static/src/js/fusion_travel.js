@@ -10,7 +10,10 @@ document.addEventListener("DOMContentLoaded", () => {
             if (returnWrap) {
                 returnWrap.hidden = oneWay;
                 const input = returnWrap.querySelector("input");
-                if (input) input.required = !oneWay;
+                if (input) {
+                    input.required = !oneWay;
+                    if (oneWay) input.value = "";
+                }
             }
         };
         radios.forEach((radio) => radio.addEventListener("change", sync));

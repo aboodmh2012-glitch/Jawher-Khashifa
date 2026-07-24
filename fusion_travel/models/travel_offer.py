@@ -11,21 +11,29 @@ class FusionTravelSearchSession(models.Model):
     _description = "Fusion Travel Search Session"
     _order = "id desc"
 
+    @api.model
+    def _default_expires_at(self):
+        raw = self.env['ir.config_parameter'].sudo().get_param(
+            'fusion_travel.offer_ttl_minutes', '20'
+        )
+        try:
+            minutes = min(max(int(raw or 20), 5), 240)
+        except (TypeError, ValueError):
+            minutes = 20
+        return fields.Datetime.now() + timedelta(minutes=minutes + 10)
+
     token = fields.Char(required=True, copy=False, default=lambda self: secrets.token_urlsafe(24), index=True)
     service_type = fields.Selection([("flight", "Flight"), ("hotel", "Hotel"), ("car", "Car / Transfer")], required=True, index=True)
     search_json = fields.Text(required=True)
     company_id = fields.Many2one("res.company", required=True, default=lambda self: self.env.company, index=True)
     partner_id = fields.Many2one("res.partner", index=True)
-    expires_at = fields.Datetime(required=True, default=lambda self: fields.Datetime.now() + timedelta(minutes=30), index=True)
+    expires_at = fields.Datetime(required=True, default=_default_expires_at, index=True)
     offer_ids = fields.One2many("fusion.travel.offer", "session_id")
 
-    _search_session_token_unique = models.Constraint(
-        "UNIQUE(token)",
-        "Search session token must be unique.",
-    )
+    _sql_constraints = [("search_session_token_unique", "unique(token)", "Search session token must be unique.")]
 
     @api.model
-    def create_from_values(self, service_type, values, partner=False):
+    def _create_from_values(self, service_type, values, partner=False):
         return self.sudo().create({
             "service_type": service_type,
             "search_json": json.dumps(values or {}, ensure_ascii=False, default=str),
@@ -33,7 +41,7 @@ class FusionTravelSearchSession(models.Model):
             "company_id": self.env.company.id,
         })
 
-    def get_search_values(self):
+    def _get_search_values(self):
         self.ensure_one()
         if self.expires_at and self.expires_at < fields.Datetime.now():
             raise ValidationError(_("This search has expired. Please search again."))
@@ -43,10 +51,29 @@ class FusionTravelSearchSession(models.Model):
             raise ValidationError(_("Stored search data is invalid.")) from exc
 
 
+    @api.model
+    def _cron_cleanup_expired(self):
+        expired = self.sudo().search([('expires_at', '<', fields.Datetime.now())], limit=5000)
+        if expired:
+            expired.unlink()
+        return True
+
+
 class FusionTravelOffer(models.Model):
     _name = "fusion.travel.offer"
     _description = "Fusion Travel Provider Offer"
     _order = "id asc"
+
+    @api.model
+    def _default_expires_at(self):
+        raw = self.env['ir.config_parameter'].sudo().get_param(
+            'fusion_travel.offer_ttl_minutes', '20'
+        )
+        try:
+            minutes = min(max(int(raw or 20), 5), 240)
+        except (TypeError, ValueError):
+            minutes = 20
+        return fields.Datetime.now() + timedelta(minutes=minutes)
 
     token = fields.Char(required=True, copy=False, default=lambda self: secrets.token_urlsafe(32), index=True)
     session_id = fields.Many2one("fusion.travel.search.session", required=True, ondelete="cascade", index=True)
@@ -57,16 +84,13 @@ class FusionTravelOffer(models.Model):
     offer_json = fields.Text(required=True)
     currency_id = fields.Many2one("res.currency")
     amount = fields.Monetary(currency_field="currency_id")
-    expires_at = fields.Datetime(required=True, default=lambda self: fields.Datetime.now() + timedelta(minutes=20), index=True)
+    expires_at = fields.Datetime(required=True, default=_default_expires_at, index=True)
     consumed = fields.Boolean(default=False, index=True)
 
-    _offer_token_unique = models.Constraint(
-        "UNIQUE(token)",
-        "Offer token must be unique.",
-    )
+    _sql_constraints = [("offer_token_unique", "unique(token)", "Offer token must be unique.")]
 
     @api.model
-    def store_offer(self, session, offer, amount=0.0, currency=False, provider="amadeus"):
+    def _store_offer(self, session, offer, amount=0.0, currency=False, provider="amadeus"):
         provider_offer_id = (offer or {}).get("id") if isinstance(offer, dict) else False
         return self.sudo().create({
             "session_id": session.id,
@@ -77,7 +101,7 @@ class FusionTravelOffer(models.Model):
             "amount": amount or 0.0,
         })
 
-    def read_offer(self, consume=False):
+    def _read_offer(self, consume=False):
         self.ensure_one()
         now = fields.Datetime.now()
         if consume:

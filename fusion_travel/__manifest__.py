@@ -1,7 +1,7 @@
 {
     "name": "Fusion Travel",
     "summary": "Unified Odoo 19 travel booking, ticketing, portal and accounting platform",
-    "version": "19.0.1.1.0",
+    "version": "19.0.2.4.0",
     "category": "Services/Travel",
     "author": "Fusion Travel",
     "website": "https://fusionlc.com",
@@ -14,13 +14,13 @@
         "account",
         "product",
     ],
-    "external_dependencies": {"python": ["amadeus"]},
     "data": [
         "security/fusion_travel_security.xml",
         "security/ir.model.access.csv",
         "data/sequence.xml",
         "data/email_templates.xml",
         "data/default_products.xml",
+        "data/cron.xml",
         "views/travel_booking_views.xml",
         "views/travel_flight_ticket_views.xml",
         "views/travel_airline_views.xml",

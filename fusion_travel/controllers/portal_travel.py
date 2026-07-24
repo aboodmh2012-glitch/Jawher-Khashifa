@@ -12,6 +12,11 @@ class FusionTravelPortalController(CustomerPortal):
             ])
         return values
 
+
+    @http.route('/my/travel', type='http', auth='user', website=True)
+    def my_travel_home(self, **kwargs):
+        return request.redirect('/my/travel/bookings')
+
     @http.route('/my/travel/bookings', type='http', auth='user', website=True)
     def my_trip_bookings(self, page=1, **kwargs):
         domain = [('partner_id', '=', request.env.user.partner_id.id)]

@@ -1,12 +1,74 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-  <record id="view_fusion_travel_airline_list" model="ir.ui.view">
-    <field name="name">fusion.travel.airline.list</field><field name="model">fusion.travel.airline</field>
-    <field name="arch" type="xml"><list><field name="name"/><field name="iata_code"/><field name="accounting_code"/><field name="icao_code"/><field name="active"/></list></field>
+  <!-- Legacy XML IDs are intentionally retained for in-place upgrades. -->
+  <record id="view_fusion_travel_airline_tree" model="ir.ui.view">
+    <field name="name">fusion.travel.airline.list</field>
+    <field name="model">fusion.travel.airline</field>
+    <field name="arch" type="xml">
+      <list string="Airlines">
+        <field name="name"/>
+        <field name="airline_code"/>
+        <field name="airline_num"/>
+        <field name="iata_code" optional="hide"/>
+        <field name="accounting_code" optional="hide"/>
+        <field name="icao_code" optional="show"/>
+        <field name="phone" optional="hide"/>
+        <field name="email" optional="hide"/>
+        <field name="website" optional="hide"/>
+        <field name="active"/>
+      </list>
+    </field>
   </record>
+
   <record id="view_fusion_travel_airline_form" model="ir.ui.view">
-    <field name="name">fusion.travel.airline.form</field><field name="model">fusion.travel.airline</field>
-    <field name="arch" type="xml"><form><sheet><group><field name="name"/><field name="iata_code"/><field name="accounting_code"/><field name="icao_code"/><field name="website"/><field name="active"/></group></sheet></form></field>
+    <field name="name">fusion.travel.airline.form</field>
+    <field name="model">fusion.travel.airline</field>
+    <field name="arch" type="xml">
+      <form string="Airline">
+        <sheet>
+          <group>
+            <group>
+              <field name="name"/>
+              <field name="airline_code"/>
+              <field name="airline_num"/>
+              <field name="active"/>
+            </group>
+            <group>
+              <field name="iata_code"/>
+              <field name="accounting_code"/>
+              <field name="icao_code"/>
+            </group>
+          </group>
+          <group string="Contact">
+            <field name="phone"/>
+            <field name="email"/>
+            <field name="website"/>
+          </group>
+        </sheet>
+      </form>
+    </field>
   </record>
-  <record id="action_fusion_travel_airlines" model="ir.actions.act_window"><field name="name">Airlines</field><field name="res_model">fusion.travel.airline</field><field name="view_mode">list,form</field></record>
+
+  <record id="view_fusion_travel_airline_search" model="ir.ui.view">
+    <field name="name">fusion.travel.airline.search</field>
+    <field name="model">fusion.travel.airline</field>
+    <field name="arch" type="xml">
+      <search string="Airlines">
+        <field name="name"/>
+        <field name="airline_code"/>
+        <field name="airline_num"/>
+        <field name="iata_code"/>
+        <field name="accounting_code"/>
+        <filter name="inactive" string="Inactive" domain="[('active', '=', False)]"/>
+      </search>
+    </field>
+  </record>
+
+  <record id="action_fusion_travel_airline" model="ir.actions.act_window">
+    <field name="name">Airlines</field>
+    <field name="res_model">fusion.travel.airline</field>
+    <field name="view_mode">list,form</field>
+    <field name="view_id" ref="view_fusion_travel_airline_tree"/>
+    <field name="search_view_id" ref="view_fusion_travel_airline_search"/>
+  </record>
 </odoo>

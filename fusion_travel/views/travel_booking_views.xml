@@ -20,6 +20,8 @@
                 <field name="payment_status" readonly="1"/>
                             <field name="payment_method"/>
                             <field name="payment_reference" readonly="1"/>
+                            <field name="wallet_transaction_id" readonly="1"/>
+                <field name="provider_order_status" widget="badge" readonly="1"/>
                 <field name="pnr" readonly="1"/>
                 <field name="total_amount"/>
                 <field name="currency_id"/>
@@ -37,12 +39,13 @@
                     <button name="action_apply_pricing_rule" string="Apply Pricing Rule" type="object" class="btn-secondary" invisible="state not in ('draft','searched','priced')"/>
                     <button name="action_price_booking" string="Revalidate Price" type="object" class="btn-primary" invisible="state not in ('searched','draft')"/>
                     <button name="action_pending_payment" string="Pending Payment" type="object" class="btn-secondary" invisible="state != 'priced'"/>
-                    <button name="action_create_sale_order" string="Create Sale Order" type="object" class="btn-secondary" invisible="sale_order_id"/>
-                    <button name="action_view_sale_order" string="View Sale Order" type="object" class="btn-secondary" invisible="not sale_order_id"/>
+                    <button name="action_create_sale_order" string="Create Sale Order" type="object" class="btn-secondary" groups="fusion_travel.group_fusion_travel_accountant" invisible="sale_order_id"/>
+                    <button name="action_view_sale_order" string="View Sale Order" type="object" class="btn-secondary" groups="fusion_travel.group_fusion_travel_accountant" invisible="not sale_order_id"/>
                     <button name="action_create_invoice" string="Create Invoice" type="object" class="btn-primary" groups="fusion_travel.group_fusion_travel_accountant" invisible="invoice_id"/>
-                    <button name="action_view_invoice" string="View Invoice" type="object" class="btn-secondary" invisible="not invoice_id"/>
+                    <button name="action_view_invoice" string="View Invoice" type="object" class="btn-secondary" groups="fusion_travel.group_fusion_travel_accountant" invisible="not invoice_id"/>
                     <button name="action_mark_payment_received" string="Sync Paid Invoice" type="object" class="btn-primary" groups="fusion_travel.group_fusion_travel_accountant" invisible="payment_status == 'paid' or state not in ('priced','pending_payment')"/>
-                    <button name="action_create_provider_order" string="Create Supplier Order" type="object" class="btn-success" groups="fusion_travel.group_fusion_travel_accountant" invisible="payment_status != 'paid' or state not in ('priced','pending_payment')"/>
+                    <button name="action_create_provider_order" string="Create Supplier Order" type="object" class="btn-success" groups="fusion_travel.group_fusion_travel_accountant" invisible="payment_status != 'paid' or state not in ('priced','pending_payment','failed') or provider_order_status != 'not_started'"/>
+                    <button name="action_reset_provider_order_for_retry" string="Reset Provider Retry" type="object" class="btn-warning" groups="fusion_travel.group_fusion_travel_manager" invisible="provider_order_status != 'needs_review'"/>
                     <button name="action_confirm_booking" string="Confirm" type="object" class="btn-primary" groups="fusion_travel.group_fusion_travel_manager" invisible="state not in ('priced','pending_payment','booked')"/>
                     <button name="action_mark_ticketed" string="Mark Ticketed" type="object" class="btn-primary" groups="fusion_travel.group_fusion_travel_accountant" invisible="state not in ('booked','confirmed')"/>
                     <button name="action_cancel" string="Cancel" type="object" class="btn-danger" groups="fusion_travel.group_fusion_travel_manager" invisible="state in ('cancelled','ticketed')"/>
@@ -79,6 +82,8 @@
                         <group>
                             <field name="ticket_number" readonly="1"/>
                             <field name="api_status" readonly="1"/>
+                            <field name="provider_order_status" widget="badge" readonly="1"/>
+                            <field name="provider_order_error" readonly="1" groups="fusion_travel.group_fusion_travel_manager" invisible="not provider_order_error"/>
                         </group>
                     </group>
                     <notebook>
