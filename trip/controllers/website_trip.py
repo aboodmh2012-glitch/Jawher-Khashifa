@@ -1,4 +1,6 @@
 import base64
+import hashlib
+import hmac
 import json
 import logging
 from datetime import date, datetime, timedelta
@@ -100,13 +102,32 @@ class TripWebsiteController(http.Controller):
             'max': 10,
         }
 
+    def _offer_signing_key(self):
+        # Server-side secret already present in every Odoo database. Used to
+        # sign search-offer payloads so a client cannot tamper with the offer
+        # (notably the price) between search and booking. Never exposed to the
+        # browser.
+        secret = request.env['ir.config_parameter'].sudo().get_param('database.secret') or ''
+        return secret.encode('utf-8')
+
+    def _sign_offer_body(self, body):
+        return hmac.new(self._offer_signing_key(), body.encode('ascii'), hashlib.sha256).hexdigest()
+
     def _encode_offer_payload(self, offer):
         raw = json.dumps(offer, ensure_ascii=False, default=str).encode('utf-8')
-        return base64.urlsafe_b64encode(raw).decode('ascii')
+        body = base64.urlsafe_b64encode(raw).decode('ascii')
+        return f'{self._sign_offer_body(body)}.{body}'
 
     def _decode_offer_payload(self, payload):
         try:
-            raw = base64.urlsafe_b64decode((payload or '').encode('ascii'))
+            signature, separator, body = (payload or '').partition('.')
+            if not separator or not signature or not body:
+                raise ValueError('Malformed offer payload.')
+            # Reject any offer whose signature does not match: the payload was
+            # either tampered with or not produced by this server's search.
+            if not hmac.compare_digest(signature, self._sign_offer_body(body)):
+                raise ValueError('Offer signature mismatch.')
+            raw = base64.urlsafe_b64decode(body.encode('ascii'))
             data = json.loads(raw.decode('utf-8'))
         except Exception as exc:  # noqa: BLE001
             raise ValidationError(_('Invalid selected offer. Please search again.')) from exc
