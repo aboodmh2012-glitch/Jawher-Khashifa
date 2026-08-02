@@ -1,131 +1,46 @@
-# Trip v1.8.1 — Code Review (مراجعة الموديول)
+# Trip v1.8.1 — Security Hardening Release
 
-مراجعة تقنية كاملة لموديول **Trip Booking Platform** على الإصدار الحالي `1.8.0`
-(فرع `claude/new-session-nlwwva`). الهدف: تقييم الجاهزية للإنتاج وتوثيق
-الثغرات والأولويات قبل أي إصدار عام / بوابة عملاء.
+This maintenance release closes two security issues found in a full code
+review of the v1.8.0 package. No schema or workflow redesign — behaviour is
+unchanged for legitimate flows.
 
-**الحكم العام:** الموديول منظم وواضح كـ MVP تشغيلي داخلي، وفيه شغل جيد على
-Amadeus + المحفظة + البحث المتقدم + العمليات اليدوية — **لكنه غير جاهز
-للإنتاج العام** قبل إغلاق البنود Critical و High أدناه.
+## Fixes
 
----
+### Portal — operations were readable across all customers (security, data leak)
+`trip.operation` granted `base.group_portal` read in `ir.model.access.csv`
+(added with the v1.8.0 manual-operations feature) but shipped **without a
+matching record rule**, unlike every other portal-exposed model. A portal user
+could therefore read *every* operation of *every* customer and company —
+exposing PNRs, ticket numbers, payment references, amounts, and customer
+links (IDOR).
 
-## ما يعمل جيداً
+A new `trip_operation_portal_own_rule` `ir.rule` now restricts portal read to
+operations of the user's own bookings
+(`booking_id.partner_id == user.partner_id`), matching the existing portal
+rules for bookings, passengers, segments, hotel stays, and car rentals.
 
-- تدفق موقع الحجوزات كامل تقريباً: بحث → اختيار → ركاب → تأكيد سعر → دفع.
-- حماية CSRF على مسارات POST العامة؛ قوالب QWeb تستخدم `t-out` (لا XSS واضح).
-- ملكية الحجز على الموقع/البوابة مربوطة بـ `partner_id` للحجز نفسه.
-- قواعد multi-company على أغلب النماذج؛ سجل API مع خيار debug محكوم.
-- مسار المحفظة يحاول الحجز عند المورّد أولاً ثم الخصم (ترتيب صحيح).
-- ربط الرضيع بالبالغ لـ Amadeus؛ قيود تواريخ الرحلة/الفندق/الجواز.
-- طبقة العمليات اليدوية + التقارير التحليلية (v1.8.0) مفيدة للتشغيل المكتبي.
+### Website — search offers are now tamper-proof (security, price tampering)
+Search offers are round-tripped through the browser as a base64 `_payload`
+hidden field and decoded when the customer selects an offer. Base64 is not a
+signature, so the payload could be edited client-side. Flights and hotels
+re-validate the price against Amadeus before payment, but **transfers/cars
+have no re-pricing call** (`action_price_booking` keeps the quoted amount), so
+a tampered `monetaryAmount` drove the invoice and wallet deduction directly —
+a financial loss to the agency.
 
----
+`_encode_offer_payload` now signs the payload with HMAC-SHA256 using the
+server-only `database.secret`, and `_decode_offer_payload` verifies the
+signature with a constant-time compare before decoding. Any tampered or
+unsigned offer is rejected with "Invalid selected offer. Please search again."
+This closes the transfer price-tampering path and hardens flights/hotels as
+defense in depth. The signing key is never sent to the browser.
 
-## Critical — يجب إصلاحها قبل أي نشر عام
+## Validation performed
+- `python3 -m py_compile` on changed Python files: PASS
+- XML well-formedness on changed XML files: PASS
+- Offer `_payload` producers/consumers cross-checked; hidden-field templates
+  unchanged (signed payload is a plain ASCII string).
 
-### C1. بوابة العملاء تقرأ كل `trip.operation`
-- **أين:** `security/ir.model.access.csv` (`access_trip_operation_portal`)
-  مقابل غياب أي `ir.rule` لـ `base.group_portal` على `trip.operation`
-  في `security/trip_security.xml`.
-- **المشكلة:** ACL قراءة بدون record rule ⇒ مستخدم البوابة يقدر يقرأ
-  عمليات كل الشركات/العملاء عبر RPC (PNR، تذاكر، مبالغ، مراجع دفع).
-- **الحل:** حذف ACL البوابة، أو إضافة rule:
-  `[('partner_id', '=', user.partner_id.id)]` بصلاحية قراءة فقط.
-
-### C2. إعادة دفع / إعادة حجز (لا idempotency)
-- **أين:** `trip_booking.py` → `action_pay_from_wallet_and_issue`،
-  `action_book_with_amadeus_card`؛ و`website_trip.py` مسار `/payment` و`/issue`.
-- **المشكلة:** لا يوجد رفض صريح إذا الحجز أصلاً `booked` / `confirmed` /
-  `paid` أو فيه `amadeus_reference`. POST مكرر يقدر ينشئ طلب مورّد ثاني
-  ويخصم من المحفظة مرة ثانية.
-- **الحل:** فشل فوري عند الحالات النهائية؛ قفل صف الحجز؛ مفتاح idempotency؛
-  إخفاء/تعطيل خطوة `/issue` إذا الدفع أنجز الحجز مسبقاً.
-
-### C3. تلاعب بسعر التحويلات (Cars/Transfers)
-- **أين:** `website_trip.py` → `_encode_offer_payload` (Base64 فقط، بلا توقيع)؛
-  `action_price_booking` لفرع السيارة يعلّم `priced` من `net_amount` المخزّن
-  بدون إعادة جلب السعر من Amadeus.
-- **المشكلة:** المهاجم يعدّل `monetaryAmount` في الـ payload → يخصم من
-  المحفظة مبلغ أقل بينما طلب Amadeus يمشي على `offerId` الحقيقي.
-- **الحل:** توقيع HMAC + انتهاء صلاحية للـ payload، أو إعادة جلب العرض
-  من السيرفر قبل الدفع؛ عدم الوثوق بأي مبلغ من المتصفح.
-
----
-
-## High
-
-| # | الموضوع | أين | الحل المقترح |
-|---|---------|-----|--------------|
-| H1 | انتقالات الحالة غير مقيّدة (`write` حر) وVoid/Refund لا يعكسون المال/المورّد | `trip_booking.py` أزرار يدوية | خريطة انتقالات + قيد؛ إشعار دائن / حركة محفظة refund / إلغاء مورّد |
-| H2 | بيانات مسافر وهمية: DOB=`1990-01-01`، هاتف=`0000000000`؛ وغياب `travelerType` في payload Amadeus | `_build_amadeus_travelers` | إجبار DOB/هاتف/إيميل؛ إرسال نوع المسافر المطابق للعرض |
-| H3 | إنشاء SO/فاتورة بدون `product_id` (وغالباً بدون حساب) | `action_create_sale_order` / `action_create_invoice` | منتج خدمة Trip قابل للإعداد لكل شركة |
-| H4 | استرداد يدوي يغيّر العلم فقط بدون قيد محفظة/إشعار دائن؛ حركات المحفظة ضعيفة القيود | `action_manual_refund` + `trip.wallet.transaction` | مسار refund حقيقي + منع مبالغ ≤ 0 + عدم حذف القيود المرحّلة |
-| H5 | دفع "بطاقة Amadeus" stub: ينشئ طلب غير مدفوع ويضبط `booked` | `action_book_with_amadeus_card` + قالب الدفع | بوابة دفع حقيقية / token قبل Create Orders، أو إزالة الخيار من الموقع |
-| H6 | إعدادات Enterprise/token URL لا يستخدمها مسار SDK الحي | `amadeus_sdk_client.py` vs `amadeus_client.py` | توحيد مسار واحد؛ أو تمرير حقول Enterprise فعلياً |
-| H7 | لا يوجد مجلد اختبارات آلي | — | اختبارات ملكية/CSRF، سباق محفظة، تلاعب عرض، mock لـ Amadeus |
-
----
-
-## Medium
-
-1. **قفل المحفظة:** مفتاح `partner_id * 1000003 + company_id` قابل للتصادم — استخدم `pg_advisory_xact_lock(partner_id, company_id)`.
-2. **رصيد المحفظة بعملة متعددة:** التحويل بسعر اليوم يحرّف الرصيد التاريخي — ثبّت عملة الشركة أو حوّل بتاريخ الحركة.
-3. **تسلسلات عالمية** (`company_id=False`) لأرقام الحجوزات/العمليات — اجعلها per-company.
-4. **Rate limit في `ir.config_parameter`:** ضعيف تحت تعدد العمال ويوسّخ الإعدادات — Redis/جدول TTL.
-5. **فنادق:** كثير من الأسعار تحتاج ضمان دفع؛ `book_hotel(..., payment=None)` قد يفشل في الإنتاج.
-6. **بوابة العرض:** تفاصيل الحجز تعرض مقاطع الطيران فقط — لا فندق/تحويل.
-7. **"Cars" = Transfers API** وليس تأجير سيارات تقليدي — فجوة منتج/تسمية.
-8. **حقول Enterprise** (`queuingOfficeId` / remarks) تُسجَّل في اللوق لكن لا تُرسل فعلياً عبر SDK.
-9. **سجلات API في وضع debug** تخزّن PII كامل — إبقاءه OFF + تشويه + سياسة احتفاظ.
-10. **قواعد التسعير:** `cabin_class` Char مقابل Selection؛ مطابقة ضعيفة للفندق/السيارة.
-
----
-
-## Low
-
-- عملة سطر الفندق/السيارة قد تختلف عن عملة الحجز.
-- `airline` الاسمي لا يُملأ عند تحميل المقاطع (فقط `airline_code`).
-- مدير سجلات API يملك `unlink` بدون `write` — خطر مسح أثر التدقيق.
-- نسخة SDK app (`1.7.1`) أقدم من بيان الموديول (`1.8.0`).
-- كود عميل HTTP القديم (`AmadeusClient`) مستورد وغير مستخدم في المسار الحي.
-
----
-
-## تدفق الموقع (ملخص)
-
-```
-بحث عام (/trip/flights|hotels|cars)
-  → اختيار عرض (يتطلب دخول)
-  → إنشاء trip.booking + أسطر
-  → ركاب
-  → تأكيد السعر (flight/hotel يعاد التحقق؛ car يعتمد العرض المخزّن)
-  → دفع: wallet (حجز+خصم+فاتورة) أو amadeus_card (stub غير مدفوع)
-  → بوابة /my/trip/booking/<id>
-```
-
----
-
-## ترتيب الإصلاح المقترح قبل الإنتاج
-
-1. C1 — قاعدة/ACL عمليات البوابة  
-2. C2 — منع إعادة الدفع/الحجز  
-3. C3 — توقيع أو إعادة جلب عروض التحويل  
-4. H2 — صحة بيانات المسافر + `travelerType`  
-5. H1/H4 — آلة حالات + مسار استرداد مالي حقيقي  
-6. H3 — منتجات/حسابات SO والفاتورة  
-7. H5 — دفع حقيقي أو إزالة خيار البطاقة من الموقع  
-8. H7 — اختبارات آلية للمسارات الحساسة  
-
----
-
-## تحقق سريع من هذه المراجعة
-
-- `python3 -m py_compile` على كل ملفات Python: **PASS**
-- صحة تكوين XML لكل ملفات الموديول: **PASS**
-- لا يوجد `__pycache__` داخل الحزمة
-
-## الخلاصة
-
-مناسبة كمنصة تشغيل داخلية لفريق موثوق مع Amadeus + إدخال يدوي.
-**لا تُفتح للعامة/البوابة** قبل إغلاق C1–C3 وH1–H5 على الأقل.
+## Carried over from v1.8.0
+Manual operations, advanced search, and reporting on top of the full Odoo 18 +
+Amadeus integration. See `REVIEW_NOTES_v1_8_0.md` for details.
