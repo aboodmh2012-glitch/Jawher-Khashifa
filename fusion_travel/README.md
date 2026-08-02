@@ -1,4 +1,4 @@
-# Fusion Travel — Integrated Odoo 19 Add-on (19.0.2.4.0)
+# Fusion Travel — Integrated Odoo 19 Add-on (19.0.2.5.0)
 
 `fusion_travel` is the upgrade-compatible unified travel module for Odoo 19. It combines the existing Fusion Travel ticket/accounting module, the supplied Trip backend, and the approved Fusion Travel Figma direction without changing the technical module name.
 
