@@ -172,7 +172,7 @@ class AmadeusSDKClient:
         headers = {
             'Authorization': 'Bearer %s' % token,
             'Accept': 'application/vnd.amadeus+json, application/json',
-            'User-Agent': 'odoo-fusion-travel/19.0.2.4.0',
+            'User-Agent': 'odoo-fusion-travel/19.0.2.5.0',
         }
         if json_body is not None:
             headers['Content-Type'] = 'application/vnd.amadeus+json'

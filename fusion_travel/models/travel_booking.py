@@ -685,19 +685,25 @@ class FusionTravelBooking(models.Model):
                 raise UserError(_('Selected hotel offer is missing its ID. Please search again.'))
             from ..services.amadeus_hotels import AmadeusHotels
             response = AmadeusHotels(booking.env).get_offer(offer_id, booking=booking)
-            data = response.get('data') if isinstance(response, dict) else {}
-            validated_offer = offer
-            hotel_info = {}
-            if isinstance(data, dict):
-                hotel_info = data.get('hotel') or {}
-                offers = data.get('offers') or []
-                for candidate in offers:
-                    if candidate.get('id') == offer_id:
-                        validated_offer = candidate
-                        break
-                else:
-                    if offers:
-                        validated_offer = offers[0]
+            data = response.get('data') if isinstance(response, dict) else None
+            if not isinstance(data, dict):
+                raise UserError(_(
+                    'The selected hotel offer could not be revalidated. Please search again.'
+                ))
+            hotel_info = data.get('hotel') or {}
+            offers = data.get('offers') or []
+            validated_offer = False
+            for candidate in offers:
+                if candidate.get('id') == offer_id:
+                    validated_offer = candidate
+                    break
+            if not validated_offer:
+                # Never fall back to a different offer: offers[0] can have a
+                # different rate/room and would invoice the wrong amount.
+                raise UserError(_(
+                    'The selected hotel offer is no longer available at the '
+                    'quoted price. Please search again.'
+                ))
             currency_name, total = booking._extract_offer_price(validated_offer)
             currency = booking.env['res.currency'].sudo().search([('name', '=', currency_name)], limit=1) or booking.currency_id
             booking._write_workflow({
@@ -739,31 +745,71 @@ class FusionTravelBooking(models.Model):
             booking._apply_pricing_rule()
         return True
 
+    def _amadeus_traveler_type(self, passenger_type):
+        return {
+            'adult': 'ADULT',
+            'child': 'CHILD',
+            'infant': 'HELD_INFANT',
+        }.get(passenger_type or 'adult', 'ADULT')
+
+    def _ensure_provider_booking_ready(self):
+        """Validate passenger/guest data before wallet capture or provider calls.
+
+        Must run before any irreversible local payment so a missing DOB/phone or
+        infant/adult mismatch cannot leave a charged booking in Needs Review.
+        """
+        for booking in self:
+            if not booking.passenger_ids:
+                raise UserError(_('Add at least one passenger before paying or booking.'))
+            if booking.booking_type == 'flight':
+                booking._build_amadeus_travelers()
+            elif booking.booking_type == 'hotel':
+                booking._build_hotel_guests()
+            elif booking.booking_type == 'car':
+                booking._build_transfer_passengers()
+        return True
+
     def _build_amadeus_travelers(self):
         self.ensure_one()
         travelers = []
+        adult_ids = []
+        infant_positions = []
         gender_map = {'male': 'MALE', 'female': 'FEMALE'}
         for index, passenger in enumerate(self.passenger_ids, start=1):
-            if not passenger.date_of_birth:
-                raise UserError(_('Date of birth is required for every flight traveler.'))
-            phone_digits = re.sub(r'\D+', '', passenger.phone or self.partner_id.phone or self.partner_id.mobile or '')
-            if not phone_digits:
-                raise UserError(_('A valid phone number is required for every flight traveler.'))
             if not passenger.first_name or not passenger.last_name:
                 raise UserError(_('Passenger first and last names are required.'))
+            if not passenger.date_of_birth:
+                raise UserError(_('Date of birth is required for every flight traveler.'))
+            phone_digits = re.sub(
+                r'\D+', '',
+                passenger.phone or self.partner_id.phone or self.partner_id.mobile or '',
+            )
+            if not phone_digits:
+                raise UserError(_('A valid phone number is required for every flight traveler.'))
+            email = (passenger.email or self.partner_id.email or '').strip()
+            if not email:
+                raise UserError(_('A valid email address is required for every flight traveler.'))
+            if passenger.passenger_type == 'adult':
+                adult_ids.append(str(index))
+            elif passenger.passenger_type == 'infant':
+                # Position (0-based) of this infant in the travelers list below.
+                infant_positions.append(len(travelers))
             traveler = {
                 'id': str(index),
                 'dateOfBirth': passenger.date_of_birth.isoformat(),
+                'travelerType': self._amadeus_traveler_type(passenger.passenger_type),
                 'name': {
                     'firstName': passenger.first_name,
                     'lastName': passenger.last_name,
                 },
                 'gender': gender_map.get(passenger.gender or 'male', 'MALE'),
                 'contact': {
-                    'emailAddress': passenger.email or self.partner_id.email or '',
+                    'emailAddress': email,
                     'phones': [{
                         'deviceType': 'MOBILE',
-                        'countryCallingCode': self.env['ir.config_parameter'].sudo().get_param('fusion_travel.default_country_calling_code', '1') or '1',
+                        'countryCallingCode': self.env['ir.config_parameter'].sudo().get_param(
+                            'fusion_travel.default_country_calling_code', '1',
+                        ) or '1',
                         'number': phone_digits,
                     }],
                 },
@@ -783,6 +829,14 @@ class FusionTravelBooking(models.Model):
             travelers.append(traveler)
         if not travelers:
             raise UserError(_('Add at least one passenger before creating the supplier order.'))
+        # Amadeus requires every held infant to be linked to an accompanying
+        # adult (one infant per adult). Without associatedAdultId the Flight
+        # Create Orders call is rejected after payment would already be taken.
+        if infant_positions:
+            if len(infant_positions) > len(adult_ids):
+                raise UserError(_('Each infant must travel with an accompanying adult.'))
+            for infant_no, position in enumerate(infant_positions):
+                travelers[position]['associatedAdultId'] = adult_ids[infant_no]
         return travelers
 
 
@@ -997,6 +1051,11 @@ class FusionTravelBooking(models.Model):
             if booking.state not in ('priced', 'pending_payment', 'failed'):
                 raise UserError(_('Revalidate the booking before paying from the wallet.'))
 
+            # Validate travelers/guests before any irreversible wallet debit or
+            # invoice posting so Amadeus identity errors never leave a paid
+            # booking stuck in Needs Review.
+            booking._ensure_provider_booking_ready()
+
             payment_key = 'wallet-booking-%s-%s' % (booking.company_id.id, booking.id)
             existing_tx = Wallet.search([
                 ('idempotency_key', '=', payment_key),
@@ -1158,6 +1217,8 @@ class FusionTravelBooking(models.Model):
                 raise UserError(_('The provider order is already processing or requires manual reconciliation.'))
             if booking.payment_status != 'paid' and not allow_unpaid:
                 raise UserError(_('Confirm payment before creating the supplier order.'))
+
+            booking._ensure_provider_booking_ready()
 
             booking._write_workflow({
                 'provider_order_status': 'processing',

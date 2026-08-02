@@ -1,7 +1,7 @@
 {
     "name": "Fusion Travel",
     "summary": "Unified Odoo 19 travel booking, ticketing, portal and accounting platform",
-    "version": "19.0.2.4.0",
+    "version": "19.0.2.5.0",
     "category": "Services/Travel",
     "author": "Fusion Travel",
     "website": "https://fusionlc.com",

@@ -1,6 +1,6 @@
 # Static Validation Report
 
-Build: `fusion_travel` version `19.0.2.4.0`
+Build: `fusion_travel` version `19.0.2.5.0`
 
 Completed checks:
 
