@@ -1,0 +1,25 @@
+{
+  "realm": "fusion",
+  "enabled": true,
+  "displayName": "Fusion Operations Platform",
+  "roles": {
+    "realm": [
+      { "name": "platform-admin" },
+      { "name": "org-admin" },
+      { "name": "ops-supervisor" },
+      { "name": "operator" },
+      { "name": "analyst" },
+      { "name": "field-user" },
+      { "name": "viewer" }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "fusion-web",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "redirectUris": ["http://localhost:5173/*"],
+      "webOrigins": ["http://localhost:5173"]
+    }
+  ]
+}
