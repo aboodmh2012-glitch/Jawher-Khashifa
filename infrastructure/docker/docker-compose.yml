@@ -1,0 +1,66 @@
+# Fusion Operations Platform — local infrastructure (§25).
+# The MVP command center runs WITHOUT any of this (in-memory + simulators).
+# Bring these up for Phase 1+ (persistence, identity, object storage, bus).
+#
+#   docker compose -f infrastructure/docker/docker-compose.yml up -d
+#
+# Never commit real credentials — values here are local-dev defaults only.
+
+name: fusion-ops
+
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_USER: fusion
+      POSTGRES_PASSWORD: fusion
+      POSTGRES_DB: fusion
+    ports: ["5432:5432"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ../database/init.sql:/docker-entrypoint-initdb.d/10-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fusion"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  timescaledb:
+    image: timescale/timescaledb:latest-pg16
+    environment:
+      POSTGRES_USER: fusion
+      POSTGRES_PASSWORD: fusion
+      POSTGRES_DB: fusion_ts
+    ports: ["5433:5432"]
+    volumes:
+      - tsdata:/var/lib/postgresql/data
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+    ports: ["8080:8080"]
+    volumes:
+      - ../keycloak/realm-fusion.json:/opt/keycloak/data/import/realm-fusion.json:ro
+
+  nats:
+    image: nats:2.10-alpine
+    command: ["-js"]
+    ports: ["4222:4222", "8222:8222"]
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: fusion
+      MINIO_ROOT_PASSWORD: fusion-change-me
+    ports: ["9000:9000", "9001:9001"]
+    volumes:
+      - miniodata:/data
+
+volumes:
+  pgdata:
+  tsdata:
+  miniodata:

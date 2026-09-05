@@ -1,0 +1,31 @@
+{
+  "name": "fusion-operations-platform",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Fusion Operations Platform — a modular, web-based operations and situational-awareness command center for civilian operations, emergency management, SAR, inspection, fleet and infrastructure monitoring, and unmanned-vehicle telemetry.",
+  "license": "MIT",
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "adapters/*",
+    "services/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n api,web -c cyan,green \"npm:dev:api\" \"npm:dev:web\"",
+    "dev:api": "npm run dev -w @fusion/operations-service",
+    "dev:web": "npm run dev -w @fusion/web-command-center",
+    "build": "npm run build -w @fusion/web-command-center",
+    "typecheck": "npm run typecheck -w @fusion/operations-service && npm run typecheck -w @fusion/web-command-center",
+    "start": "npm run dev",
+    "infra:up": "docker compose -f infrastructure/docker/docker-compose.yml up -d",
+    "infra:down": "docker compose -f infrastructure/docker/docker-compose.yml down"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "typescript": "^5.6.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
