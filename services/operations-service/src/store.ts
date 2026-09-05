@@ -7,7 +7,10 @@ import { randomUUID } from 'node:crypto';
 import type {
   Asset, Alert, Incident, OperationalTask, OpsEvent, Geofence, RouteEntity,
   AuditLog, User, Organization, TelemetrySample, NormalizedTelemetry, LinkState,
+  RawEvent, Operation, Feature, Group, TelemetryChannel,
 } from '@fusion/shared-types';
+
+const RAW_CAP = 2000; // bounded raw-event journal (in-memory demo; partitioned table in prod)
 
 const TELEMETRY_CAP = 600; // ~10 min at 1 Hz per asset
 
@@ -21,6 +24,11 @@ export class Store {
   events: OpsEvent[] = [];
   geofences = new Map<string, Geofence>();
   routes = new Map<string, RouteEntity>();
+  operations = new Map<string, Operation>();
+  features = new Map<string, Feature>();
+  groups = new Map<string, Group>();
+  channels: TelemetryChannel[] = [];
+  rawEvents: RawEvent[] = [];
   audit: AuditLog[] = [];
   private telemetry = new Map<string, TelemetrySample[]>();
 
@@ -137,12 +145,56 @@ export class Store {
     return log;
   }
 
+  // ---- raw-event journal (replayability) ----
+  addRawEvent(protocol: string, messageType: string, payload: unknown, ref?: { deviceId?: string; assetId?: string }): RawEvent {
+    const raw: RawEvent = {
+      id: randomUUID(), protocol, messageType, payload,
+      payloadFormat: typeof payload === 'string' ? 'text' : 'json',
+      receivedAt: Date.now(), parserVersion: '0.1.0', correlationId: randomUUID(),
+      deviceId: ref?.deviceId, assetId: ref?.assetId,
+    };
+    this.rawEvents.push(raw);
+    if (this.rawEvents.length > RAW_CAP) this.rawEvents.shift();
+    return raw;
+  }
+
+  // ---- operations / features / groups ----
+  addOperation(o: Partial<Operation> & Pick<Operation, 'name'>): Operation {
+    const op: Operation = {
+      id: o.id ?? randomUUID(), organizationId: this.orgId, name: o.name,
+      description: o.description, status: o.status ?? 'active', priority: o.priority,
+      startsAt: o.startsAt, endsAt: o.endsAt, geometry: o.geometry, createdBy: o.createdBy,
+      createdAt: Date.now(),
+    };
+    this.operations.set(op.id, op);
+    return op;
+  }
+  addFeature(f: Partial<Feature> & Pick<Feature, 'operationId' | 'type' | 'geometryType' | 'coordinates'>): Feature {
+    const now = Date.now();
+    const feat: Feature = {
+      id: f.id ?? randomUUID(), operationId: f.operationId, orgId: this.orgId,
+      type: f.type, geometryType: f.geometryType, coordinates: f.coordinates,
+      properties: f.properties ?? {}, source: f.source ?? 'user', createdBy: f.createdBy,
+      version: 1, createdAt: now, updatedAt: now,
+    };
+    this.features.set(feat.id, feat);
+    return feat;
+  }
+  updateFeature(id: string, patch: Partial<Feature>): Feature | null {
+    const feat = this.features.get(id);
+    if (!feat) return null;
+    Object.assign(feat, patch, { version: feat.version + 1, updatedAt: Date.now() });
+    return feat;
+  }
+  deleteFeature(id: string): boolean { return this.features.delete(id); }
+
   snapshot() {
     return {
       assets: [...this.assets.values()],
       alerts: [...this.alerts.values()].filter((a) => a.status !== 'resolved').slice(0, 100),
       incidents: [...this.incidents.values()],
       events: this.events.slice(0, 60),
+      features: [...this.features.values()],
     };
   }
 }

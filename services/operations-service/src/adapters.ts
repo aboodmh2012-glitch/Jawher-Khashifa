@@ -14,6 +14,13 @@ import { config } from './config.js';
 
 export function buildContext(store: Store, bus: Bus, alerts: AlertEngine): AdapterContext {
   return {
+    onRaw(protocol, messageType, payload) {
+      const p = payload as { id?: string; vehicle_id?: string; device_id?: string };
+      const raw = store.addRawEvent(protocol, messageType, payload, {
+        assetId: p?.vehicle_id ?? p?.id, deviceId: p?.device_id,
+      });
+      return raw.correlationId;
+    },
     onTelemetry(t) {
       const asset = store.applyTelemetry(t);
       if (!asset) return;

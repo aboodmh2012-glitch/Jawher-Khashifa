@@ -54,6 +54,21 @@ export function seedDemo(store: Store): void {
     description: 'Automated inspection flagged a crack for review.',
   });
 
+  // Operation (top-level container) + a couple of map features (canonical only)
+  const op = store.addOperation({ id: 'op-demo', name: 'Operation Northwatch', description: 'Standing civilian ops picture for the demo AO.', status: 'active', priority: 'high', geometry: store.geofences.get('gf-aoi')?.polygon });
+  store.addFeature({ operationId: op.id, type: 'route', geometryType: 'LineString', coordinates: store.routes.get('rt-1')!.waypoints, properties: { name: 'Inspection Route 1' }, source: 'user' });
+  store.addFeature({ operationId: op.id, type: 'marker', geometryType: 'Point', coordinates: [c.lon + 0.09, c.lat + 0.07], properties: { name: 'Rally Point', label: 'RP-1' }, source: 'user' });
+  store.addFeature({ operationId: op.id, type: 'zone', geometryType: 'Polygon', coordinates: store.geofences.get('gf-aoi')!.polygon, properties: { name: 'Search Area Alpha' }, source: 'user' });
+
+  // Declared telemetry channels (provider metadata, Open-MCT style)
+  store.channels = [
+    { id: 'power.battery', key: 'battery', name: 'Battery', unit: '%', dataType: 'number', min: 0, max: 100 },
+    { id: 'navigation.altitude', key: 'altitude', name: 'Altitude', unit: 'm', dataType: 'number' },
+    { id: 'navigation.speed', key: 'groundSpeed', name: 'Ground speed', unit: 'm/s', dataType: 'number' },
+    { id: 'navigation.heading', key: 'heading', name: 'Heading', unit: '°', dataType: 'number', min: 0, max: 360 },
+    { id: 'link.quality', key: 'linkQuality', name: 'Link quality', unit: '%', dataType: 'number', min: 0, max: 100 },
+  ];
+
   store.addTask({ name: 'Overwatch — warehouse fire', type: 'observation', priority: 'urgent', status: 'active', assignedAssetId: 'UAV-01', location: { lat: c.lat + 0.02, lon: c.lon - 0.02 } });
   store.addTask({ name: 'Grid search — Area Alpha', type: 'search-area', priority: 'high', status: 'assigned', assignedAssetId: 'UAV-02', routeId: 'rt-1' });
   store.addTask({ name: 'Pipeline survey — sector 4', type: 'infrastructure-inspection', priority: 'normal', status: 'planned' });

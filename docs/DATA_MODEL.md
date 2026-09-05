@@ -34,6 +34,24 @@ Organization
 | `Geofence` | id, name, kind (zone/no-fly/area-of-interest), polygon |
 | `RouteEntity` | id, name, waypoints[] |
 | `AuditLog` | id, userId, action, resource, at, previousValue, newValue |
+| `RawEvent` | id, protocol, messageType, payload, receivedAt, parserVersion, correlationId — **kept verbatim, never deleted**, so the pipeline is replayable if a parser changes |
+| `Operation` | id, name, status, priority, geometry — top-level container; assets/incidents/tasks/features hang off it |
+| `Feature` | id, operationId, type, geometryType, coordinates, properties, version — **canonical geometry + semantics only**; presentation lives in `FeatureStyle` |
+| `TelemetryChannel` | id (e.g. `power.battery`), key, name, unit, dataType, min, max — declared provider metadata |
+
+## Raw journal & replay
+
+`RawEvent` records the original source message **before** normalization
+(`RawEvent → parse → normalize → domain`). Because it is retained, a parser fix
+can be re-applied to historical data (`POST /api/raw-events/reprocess` is the
+seam). In production this is a partitioned/retention-managed table, not the MVP's
+bounded in-memory ring.
+
+## Canonical vs presentation
+
+`Feature` never stores `iconSize`, `screenX`, `zoom`, or `selected`. Rendering
+attributes live in `FeatureStyle` (or are computed in the client), so the same
+canonical feature can be styled per-viewer without mutating shared data.
 
 ## Link freshness (§21)
 

@@ -5,7 +5,7 @@
 
 import { config } from './config.js';
 import { getToken } from './api.js';
-import type { Asset, Alert, Incident, OpsEvent, Geofence, RouteEntity, OperationalTask } from '@fusion/shared-types';
+import type { Asset, Alert, Incident, OpsEvent, Geofence, RouteEntity, OperationalTask, Feature } from '@fusion/shared-types';
 import type { ServerMessage } from '@fusion/event-contracts';
 
 export interface TelemPoint { t: number; battery?: number; altitude?: number; speed?: number; }
@@ -17,6 +17,7 @@ class LiveStore {
   alerts = new Map<string, Alert>();
   incidents = new Map<string, Incident>();
   tasks = new Map<string, OperationalTask>();
+  features = new Map<string, Feature>();
   events: OpsEvent[] = [];
   geofences: Geofence[] = [];
   routes: RouteEntity[] = [];
@@ -82,6 +83,7 @@ class LiveStore {
         this.assets = new Map(p.assets.map((a) => [a.id, a]));
         this.alerts = new Map(p.alerts.filter((a) => a.status !== 'resolved').map((a) => [a.id, a]));
         this.incidents = new Map(p.incidents.map((i) => [i.id, i]));
+        this.features = new Map((p.features ?? []).map((f) => [f.id, f]));
         this.events = p.events;
         for (const a of p.assets) if (a.position) this.pushTrail(a.id, a.position.lon, a.position.lat);
         this.notifyNow();
@@ -128,12 +130,15 @@ class LiveStore {
       case 'incident.updated': { this.incidents.set(msg.payload.id, msg.payload); this.notifyNow(); break; }
       case 'task.created':
       case 'task.updated': { this.tasks.set(msg.payload.id, msg.payload); this.notifyNow(); break; }
+      case 'feature.created':
+      case 'feature.updated': { this.features.set(msg.payload.id, msg.payload); this.notifyNow(); break; }
+      case 'feature.deleted': { this.features.delete(msg.payload.id); this.notifyNow(); break; }
       case 'event': { this.events.unshift(msg.payload); if (this.events.length > 200) this.events.pop(); this.notify(); break; }
       default: break;
     }
   }
 }
 
-interface SnapshotPayload { assets: Asset[]; alerts: Alert[]; incidents: Incident[]; events: OpsEvent[]; }
+interface SnapshotPayload { assets: Asset[]; alerts: Alert[]; incidents: Incident[]; events: OpsEvent[]; features: Feature[]; }
 
 export const live = new LiveStore();

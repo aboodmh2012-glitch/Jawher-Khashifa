@@ -123,6 +123,52 @@ export function registerRoutes(app: FastifyInstance, store: Store, bus: Bus): vo
     return alert;
   });
 
+  // ---- operations / features / channels / raw journal ----
+  app.get('/api/operations', async (req, reply) => requireAuth(req, reply) && [...store.operations.values()]);
+  app.get('/api/telemetry/channels', async (req, reply) => requireAuth(req, reply) && store.channels);
+
+  app.get('/api/features', async (req, reply) => {
+    if (!requireAuth(req, reply)) return;
+    const opId = (req.query as { operationId?: string }).operationId;
+    return [...store.features.values()].filter((f) => !opId || f.operationId === opId);
+  });
+  app.post('/api/features', async (req, reply) => {
+    const a = requireRole(req, reply, 'operator'); if (!a) return;
+    const feat = store.addFeature(req.body as Parameters<typeof store.addFeature>[0]);
+    store.addAudit({ userId: a.sub, action: 'feature.create', resource: feat.id, newValue: feat });
+    bus.publish(envelope('feature.created', feat));
+    return reply.code(201).send(feat);
+  });
+  app.patch('/api/features/:id', async (req, reply) => {
+    const a = requireRole(req, reply, 'operator'); if (!a) return;
+    const feat = store.updateFeature((req.params as { id: string }).id, req.body as object);
+    if (!feat) return reply.code(404).send({ error: 'not found' });
+    store.addAudit({ userId: a.sub, action: 'feature.update', resource: feat.id });
+    bus.publish(envelope('feature.updated', feat));
+    return feat;
+  });
+  app.delete('/api/features/:id', async (req, reply) => {
+    const a = requireRole(req, reply, 'operator'); if (!a) return;
+    const id = (req.params as { id: string }).id;
+    const feat = store.features.get(id);
+    if (!store.deleteFeature(id)) return reply.code(404).send({ error: 'not found' });
+    store.addAudit({ userId: a.sub, action: 'feature.delete', resource: id });
+    bus.publish(envelope('feature.deleted', { id, operationId: feat?.operationId ?? '' }));
+    return reply.code(204).send();
+  });
+
+  app.get('/api/raw-events', async (req, reply) => {
+    const a = requireRole(req, reply, 'analyst'); if (!a) return;
+    const limit = Number((req.query as { limit?: string }).limit ?? 100);
+    return store.rawEvents.slice(-limit).reverse();
+  });
+  app.post('/api/raw-events/reprocess', async (req, reply) => {
+    const a = requireRole(req, reply, 'ops-supervisor'); if (!a) return;
+    // Seam for replaying the journal through current parsers/normalizers.
+    store.addAudit({ userId: a.sub, action: 'raw.reprocess', resource: 'journal' });
+    return { journaled: store.rawEvents.length, note: 'reprocess is a Phase-2 batch job (journal is retained for replay)' };
+  });
+
   // ---- events / map / audit / integrations ----
   app.get('/api/events', async (req, reply) => requireAuth(req, reply) && store.events);
   app.get('/api/map/geofences', async (req, reply) => requireAuth(req, reply) && [...store.geofences.values()]);

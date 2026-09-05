@@ -26,9 +26,16 @@ export function MapView() {
     map.addControl(new maplibregl.AttributionControl({ compact: true }));
 
     map.on('load', () => {
-      for (const id of ['geofences', 'routes', 'trails', 'headings', 'assets', 'incidents', 'selection']) {
+      for (const id of ['geofences', 'routes', 'features', 'trails', 'headings', 'assets', 'incidents', 'selection']) {
         map.addSource(id, { type: 'geojson', data: empty });
       }
+      // Operation features (canonical geometry; styling applied here, not stored on the feature)
+      map.addLayer({ id: 'features-fill', type: 'fill', source: 'features', filter: ['==', ['geometry-type'], 'Polygon'], paint: { 'fill-color': '#b98cff', 'fill-opacity': 0.08 } });
+      map.addLayer({ id: 'features-line', type: 'line', source: 'features', filter: ['in', ['geometry-type'], ['literal', ['LineString', 'Polygon']]], paint: { 'line-color': '#b98cff', 'line-width': 1.6, 'line-opacity': 0.7 } });
+      map.addLayer({ id: 'features-point', type: 'circle', source: 'features', filter: ['==', ['geometry-type'], 'Point'], paint: { 'circle-radius': 5, 'circle-color': '#b98cff', 'circle-stroke-color': '#0a0f16', 'circle-stroke-width': 1.5 } });
+      map.addLayer({ id: 'features-label', type: 'symbol', source: 'features', filter: ['==', ['geometry-type'], 'Point'],
+        layout: { 'text-field': ['coalesce', ['get', 'label'], ['get', 'name']], 'text-size': 10, 'text-offset': [0, 1.2], 'text-anchor': 'top', 'text-font': ['Open Sans Regular', 'Noto Sans Regular'] },
+        paint: { 'text-color': '#b98cff', 'text-halo-color': '#0a0f16', 'text-halo-width': 1 } });
       map.addLayer({ id: 'geofences-fill', type: 'fill', source: 'geofences', paint: { 'fill-color': ['get', 'color'], 'fill-opacity': 0.08 } });
       map.addLayer({ id: 'geofences-line', type: 'line', source: 'geofences', paint: { 'line-color': ['get', 'color'], 'line-width': 1.4, 'line-dasharray': [2, 1.5], 'line-opacity': 0.7 } });
       map.addLayer({ id: 'routes-line', type: 'line', source: 'routes', paint: { 'line-color': '#7c9cff', 'line-width': 2, 'line-opacity': 0.55, 'line-dasharray': [1, 1] } });
@@ -114,6 +121,13 @@ function redraw(map: MLMap) {
     type: 'Feature' as const, geometry: { type: 'LineString' as const, coordinates: r.waypoints }, properties: {},
   }));
   src('routes')?.setData({ type: 'FeatureCollection', features: rtFeats });
+
+  const featFeats = [...live.features.values()].map((f) => ({
+    type: 'Feature' as const,
+    geometry: { type: f.geometryType, coordinates: f.coordinates } as GeoJSON.Geometry,
+    properties: { id: f.id, name: (f.properties?.name as string) ?? '', label: (f.properties?.label as string) ?? '' },
+  }));
+  src('features')?.setData({ type: 'FeatureCollection', features: featFeats });
 
   const selAsset = sel ? live.assets.get(sel) : undefined;
   src('selection')?.setData(selAsset?.position

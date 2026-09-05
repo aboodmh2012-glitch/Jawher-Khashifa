@@ -158,3 +158,91 @@ export interface AuthSession {
   user: User;
   expiresAt: number;
 }
+
+// ── Final-architecture additions ────────────────────────────────────────────
+
+/**
+ * Raw, unparsed source message — kept verbatim beside the derived data so the
+ * pipeline is replayable if a parser changes (RawEvent → normalize → domain).
+ * Never deleted after parsing.
+ */
+export interface RawEvent {
+  id: string;
+  deviceId?: string;
+  assetId?: string;
+  protocol: string;          // MAVLINK | COT | GPS | SIM | ...
+  messageType: string;       // GLOBAL_POSITION_INT | event | ...
+  payload: unknown;          // original message (object or string)
+  payloadFormat: 'json' | 'xml' | 'text' | 'binary-base64';
+  sourceTimestamp?: number;
+  receivedAt: number;
+  parserVersion: string;
+  correlationId: string;
+}
+
+/** Top-level container for a piece of work. Assets/incidents/tasks/features hang off it. */
+export interface Operation {
+  id: string;
+  organizationId: string;
+  name: string;
+  description?: string;
+  status: 'draft' | 'active' | 'paused' | 'closed' | 'archived';
+  priority?: 'low' | 'normal' | 'high' | 'urgent';
+  startsAt?: number;
+  endsAt?: number;
+  /** GeoJSON polygon rings (area of operation), optional. */
+  geometry?: number[][][];
+  createdBy?: string;
+  createdAt: number;
+}
+
+export type FeatureGeometryType =
+  | 'Point' | 'LineString' | 'Polygon' | 'MultiPoint' | 'MultiLineString' | 'MultiPolygon';
+
+/** A map annotation — canonical geometry + semantic properties ONLY.
+ *  Presentation (icon/zoom/selection) lives separately (see FeatureStyle). */
+export interface Feature {
+  id: string;
+  operationId: string;
+  orgId: string;
+  type: string;              // marker | route | zone | line | ...
+  geometryType: FeatureGeometryType;
+  coordinates: unknown;      // GeoJSON coordinates for geometryType
+  properties: Record<string, unknown>;
+  source: string;            // user | adapter:<kind> | import
+  createdBy?: string;
+  version: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
+/** Presentation, kept out of the canonical Feature (§ "Presentation منفصلة"). */
+export interface FeatureStyle {
+  featureId: string;
+  icon?: string;
+  fill?: string;
+  stroke?: string;
+  opacity?: number;
+  minZoom?: number;
+  maxZoom?: number;
+}
+
+export interface Group {
+  id: string;
+  organizationId: string;
+  name: string;
+  description?: string;
+  memberIds: string[];
+}
+
+/** Declared telemetry channel (Open-MCT-style provider metadata). */
+export interface TelemetryChannel {
+  id: string;               // e.g. power.battery
+  assetType?: AssetType;
+  key: string;
+  name: string;
+  unit?: string;
+  dataType: 'number' | 'enum' | 'string';
+  min?: number;
+  max?: number;
+}

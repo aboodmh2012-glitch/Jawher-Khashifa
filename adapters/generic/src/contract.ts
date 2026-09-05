@@ -9,6 +9,9 @@ import type { Asset, AssetType, NormalizedTelemetry } from '@fusion/shared-types
 
 /** What the platform hands every adapter so it can report upstream. */
 export interface AdapterContext {
+  /** Record the original, unparsed source message in the raw journal (replayability).
+   *  Returns a correlationId adapters may attach to the telemetry they derive. */
+  onRaw?(protocol: string, messageType: string, payload: unknown): string;
   /** Report a normalized telemetry sample (the main data path). */
   onTelemetry(sample: NormalizedTelemetry): void;
   /** Announce/refresh an asset the adapter manages. */

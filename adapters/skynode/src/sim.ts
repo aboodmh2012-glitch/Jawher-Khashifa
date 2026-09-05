@@ -122,6 +122,8 @@ export class SkynodeSimAdapter extends BaseAdapter {
         sensor_status: 'ok',
         camera_status: 'streaming',
       };
+      // journal the raw Skynode/PX4 message before deriving anything from it
+      ctx.onRaw?.('SKYNODE', 'telemetry', raw);
       ctx.onTelemetry(normalizeSkynode(raw));
     }
   }
