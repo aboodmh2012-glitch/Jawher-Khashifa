@@ -1,7 +1,8 @@
-// Versioned runtime schemas. Compile-time TS types are NOT enough at trust
-// boundaries — external/adapter payloads must be validated at runtime before
-// they enter domain processing. Schemas are versioned (name.vN) so the wire
-// format can evolve without breaking older producers.
+// @fusion/schemas — versioned runtime schemas (Zod). Compile-time TS types are
+// NOT enough at trust boundaries; external/adapter payloads and the event
+// envelope are validated at runtime before entering domain processing. Schemas
+// are versioned (name.vN) so the wire format can evolve without breaking
+// older producers. The @fusion/validation package consumes this registry.
 
 import { z } from 'zod';
 
@@ -11,8 +12,27 @@ const geoPoint = z.object({
   altitude: z.number().optional(),
 });
 
+/** envelope.v1 — the transport envelope every bus/WS message travels in. */
+export const EventEnvelopeSchema = z.object({
+  eventId: z.string().min(1),
+  type: z.string().min(1),
+  schemaVersion: z.number().int().nonnegative(),
+  source: z.string().min(1),
+  occurredAt: z.number().positive(),
+  receivedAt: z.number().positive(),
+  correlationId: z.string().min(1),
+  causationId: z.string().optional(),
+  organizationId: z.string().optional(),
+  operationId: z.string().optional(),
+  assetId: z.string().optional(),
+  deviceId: z.string().optional(),
+  sequence: z.number().optional(),
+  traceId: z.string().optional(),
+  payload: z.unknown(),
+}).passthrough();
+
 /** raw-event.v1 — the journaled, unparsed source message envelope. */
-export const rawEventV1 = z.object({
+export const RawEventSchema = z.object({
   id: z.string().min(1),
   protocol: z.string().min(1),
   messageType: z.string().min(1),
@@ -25,7 +45,7 @@ export const rawEventV1 = z.object({
 }).passthrough();
 
 /** asset.v1 — a registered asset (vendor-neutral). */
-export const assetV1 = z.object({
+export const AssetSchema = z.object({
   id: z.string().min(1),
   orgId: z.string().min(1),
   name: z.string().min(1),
@@ -33,7 +53,7 @@ export const assetV1 = z.object({
 }).passthrough();
 
 /** telemetry.v1 — the normalized, vendor-neutral telemetry sample. */
-export const telemetryV1 = z.object({
+export const NormalizedTelemetrySchema = z.object({
   deviceId: z.string().min(1),
   assetId: z.string().min(1),
   timestamp: z.number().positive(),
@@ -46,7 +66,7 @@ export const telemetryV1 = z.object({
 }).passthrough();
 
 /** observation.v1 — one source's report at one time (Phase B populates it). */
-export const observationV1 = z.object({
+export const ObservationSchema = z.object({
   id: z.string().min(1),
   sourceId: z.string().min(1),
   timestamp: z.number().positive(),
@@ -57,7 +77,7 @@ export const observationV1 = z.object({
 }).passthrough();
 
 /** track.v1 — fused understanding of an observed entity (Phase B). */
-export const trackV1 = z.object({
+export const TrackSchema = z.object({
   id: z.string().min(1),
   state: z.enum(['tentative', 'confirmed', 'coasting', 'lost', 'archived']),
   confidence: z.number().min(0).max(1),
@@ -66,7 +86,7 @@ export const trackV1 = z.object({
 }).passthrough();
 
 /** feature.v1 — a canonical map annotation. */
-export const featureV1 = z.object({
+export const FeatureSchema = z.object({
   operationId: z.string().min(1),
   type: z.string().min(1),
   geometryType: z.enum(['Point', 'LineString', 'Polygon', 'MultiPoint', 'MultiLineString', 'MultiPolygon']),
@@ -74,20 +94,22 @@ export const featureV1 = z.object({
 }).passthrough();
 
 /** incident.v1 — an incident record. */
-export const incidentV1 = z.object({
+export const IncidentSchema = z.object({
   title: z.string().min(1),
   type: z.string().min(1),
   severity: z.enum(['info', 'minor', 'major', 'critical']),
 }).passthrough();
 
+/** The versioned registry consumed by the validator. */
 export const SCHEMAS = {
-  'raw-event.v1': { version: 1, schema: rawEventV1 },
-  'asset.v1': { version: 1, schema: assetV1 },
-  'telemetry.v1': { version: 1, schema: telemetryV1 },
-  'observation.v1': { version: 1, schema: observationV1 },
-  'track.v1': { version: 1, schema: trackV1 },
-  'feature.v1': { version: 1, schema: featureV1 },
-  'incident.v1': { version: 1, schema: incidentV1 },
+  'envelope.v1': { version: 1, schema: EventEnvelopeSchema },
+  'raw-event.v1': { version: 1, schema: RawEventSchema },
+  'asset.v1': { version: 1, schema: AssetSchema },
+  'telemetry.v1': { version: 1, schema: NormalizedTelemetrySchema },
+  'observation.v1': { version: 1, schema: ObservationSchema },
+  'track.v1': { version: 1, schema: TrackSchema },
+  'feature.v1': { version: 1, schema: FeatureSchema },
+  'incident.v1': { version: 1, schema: IncidentSchema },
 } as const;
 
 export type SchemaId = keyof typeof SCHEMAS;

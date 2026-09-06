@@ -3,6 +3,16 @@
 Base URL: `http://localhost:4000`. OpenAPI document: `GET /api/openapi.json`.
 All `/api/*` routes except `/api/auth/login` require `Authorization: Bearer <token>`.
 
+## Health
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/health/live` | process is up (liveness) |
+| GET | `/health/ready` | critical deps initialized; 503 until ready. Demo-memory mode is ready with no external infra. |
+| GET | `/health` | legacy alias (kept for compatibility) |
+| GET | `/api/schemas` | registered runtime schemas (`envelope.v1`, `raw-event.v1`, `telemetry.v1`, …) |
+| GET | `/api/quarantine` | invalid payloads that failed validation (analyst+) |
+| GET | `/api/raw-events/by-correlation/:cid` | trace derived data back to its raw source (analyst+) |
+
 ## Auth
 | Method | Path | Notes |
 |---|---|---|

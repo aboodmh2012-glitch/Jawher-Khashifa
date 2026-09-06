@@ -1,31 +1,34 @@
-// Schema registry + validator + quarantine types.
+// @fusion/validation — the validator + quarantine types over the @fusion/schemas
+// registry.
 //
 //   RawEvent → validate(schemaId, payload)
 //                ├── valid   → normalizer / domain
 //                └── invalid → QuarantinedEvent (never crashes processing)
 
-import { SCHEMAS, type SchemaId } from './schemas.js';
+import { SCHEMAS, type SchemaId } from '@fusion/schemas';
 
-export * from './schemas.js';
+export * from '@fusion/schemas';
 
-export interface ValidationError {
+export interface ValidationIssue {
   path: string;
   message: string;
 }
+/** @deprecated alias kept for backward compatibility — use ValidationIssue. */
+export type ValidationError = ValidationIssue;
 
 export interface ValidationResult<T = unknown> {
   valid: boolean;
   schemaId: string;
   schemaVersion: number;
   value?: T;
-  errors: ValidationError[];
+  errors: ValidationIssue[];
 }
 
 export interface QuarantinedEvent {
   id: string;
   schemaId: string;
   schemaVersion: number;
-  errors: ValidationError[];
+  errors: ValidationIssue[];
   source: string;
   rawEventId?: string;
   correlationId?: string;

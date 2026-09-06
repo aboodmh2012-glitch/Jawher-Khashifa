@@ -85,11 +85,20 @@ export interface NormalizedTelemetry {
   provenance?: TelemetryProvenance;
 }
 
-export interface TelemetryProvenance {
-  rawEventId: string;
-  correlationId: string;
+/** Identifies where a datum came from (protocol/message-type/source). */
+export interface SourceReference {
   sourceProtocol: string;      // MAVLINK | COT | SKYNODE | SIM | ...
   sourceMessageType: string;
+  sourceId?: string;           // adapter/device/service identity, when known
+}
+
+/** Provenance carried on any derived datum, linking it back to its RawEvent. */
+export interface DataProvenance extends SourceReference {
+  rawEventId: string;
+  correlationId: string;
   receivedAt: number;
   parserVersion: string;
 }
+
+/** @deprecated name kept for compatibility — use DataProvenance. */
+export type TelemetryProvenance = DataProvenance;
