@@ -17,6 +17,7 @@
     "@fusion/adapter-skynode": "*",
     "@fusion/adapter-tak": "*",
     "@fusion/adapter-video": "*",
+    "@fusion/authorization": "*",
     "@fusion/event-contracts": "*",
     "@fusion/repositories": "*",
     "@fusion/shared-types": "*",

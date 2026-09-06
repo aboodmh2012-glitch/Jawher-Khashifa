@@ -13,6 +13,21 @@ import type { QuarantinedEvent } from '@fusion/validation';
 
 const RAW_CAP = 2000; // bounded raw-event journal (in-memory demo; partitioned table in prod)
 
+const SENSITIVE = /^(token|password|secret|authorization|apikey|api_key|key|jwt)$/i;
+/** Recursively replace sensitive values with '[redacted]' before audit storage. */
+function redact(value: unknown, depth = 0): unknown {
+  if (value == null || depth > 6) return value;
+  if (Array.isArray(value)) return value.map((v) => redact(v, depth + 1));
+  if (typeof value === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      out[k] = SENSITIVE.test(k) ? '[redacted]' : redact(v, depth + 1);
+    }
+    return out;
+  }
+  return value;
+}
+
 const TELEMETRY_CAP = 600; // ~10 min at 1 Hz per asset
 
 export class Store {
@@ -147,8 +162,36 @@ export class Store {
     return task;
   }
 
-  addAudit(entry: Omit<AuditLog, 'id' | 'orgId' | 'at'>): AuditLog {
-    const log: AuditLog = { id: randomUUID(), orgId: this.orgId, at: Date.now(), ...entry };
+  addAudit(entry: {
+    actorId: string;
+    action: string;
+    resourceType: string;
+    resourceId?: string;
+    actorType?: AuditLog['actorType'];
+    organizationId?: string;
+    operationId?: string;
+    correlationId?: string;
+    previousValue?: unknown;
+    newValue?: unknown;
+    sourceIp?: string;
+    result?: AuditLog['result'];
+  }): AuditLog {
+    const log: AuditLog = {
+      id: randomUUID(),
+      at: Date.now(),
+      actorId: entry.actorId,
+      actorType: entry.actorType ?? 'user',
+      action: entry.action,
+      resourceType: entry.resourceType,
+      resourceId: entry.resourceId,
+      organizationId: entry.organizationId ?? this.orgId,
+      operationId: entry.operationId,
+      correlationId: entry.correlationId,
+      previousValue: redact(entry.previousValue),
+      newValue: redact(entry.newValue),
+      sourceIp: entry.sourceIp,
+      result: entry.result ?? 'success',
+    };
     this.audit.unshift(log);
     if (this.audit.length > 1000) this.audit.pop();
     return log;

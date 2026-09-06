@@ -117,6 +117,30 @@ export type ServerMessage =
   | TrackCreatedMsg | TrackUpdatedMsg | TrackCoastingMsg | TrackLostMsg
   | EventMsg | SnapshotMsg;
 
+// ── Realtime Gateway V2 protocol (§C1) ──────────────────────────────────────
+
+export interface SubscriptionChannel {
+  kind: 'organization' | 'operation' | 'asset' | 'track' | 'type';
+  id?: string;      // operation/asset/track id
+  value?: string;   // event type, for kind:'type'
+}
+
+/** Messages a client sends to the gateway. */
+export type ClientMessage =
+  | { type: 'subscribe'; channels: SubscriptionChannel[] }
+  | { type: 'unsubscribe'; channels: SubscriptionChannel[] }
+  | { type: 'resume'; fromSeq: number }
+  | { type: 'ping' }
+  | { type: 'pong' }
+  | { type: 'ack'; seq: number };
+
+/** Control frames the gateway sends (distinct from domain ServerMessages). */
+export type ControlMessage =
+  | { topic: 'ping'; ts: number }
+  | { topic: 'pong'; ts: number }
+  | { topic: 'ack'; seq: number }
+  | { topic: 'error'; message: string };
+
 /** Works in Node 20+ and browsers without importing node:crypto (keeps the
  *  frontend bundle clean). */
 export function newId(): string {

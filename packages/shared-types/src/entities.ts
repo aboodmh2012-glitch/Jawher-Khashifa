@@ -140,17 +140,22 @@ export interface RouteEntity {
   waypoints: number[][];
 }
 
+/** Append-only audit record (V2). Sensitive values are redacted before storage. */
 export interface AuditLog {
-  id: string;
-  orgId: string;
-  userId: string;
+  id: string;                 // auditId
+  at: number;                 // timestamp
+  actorId: string;
+  actorType: 'user' | 'service' | 'system';
   action: string;
-  resource: string;
-  at: number;
-  ip?: string;
-  session?: string;
+  resourceType: string;
+  resourceId?: string;
+  organizationId: string;
+  operationId?: string;
+  correlationId?: string;
   previousValue?: unknown;
   newValue?: unknown;
+  sourceIp?: string;
+  result: 'success' | 'denied' | 'error';
 }
 
 export interface AuthSession {

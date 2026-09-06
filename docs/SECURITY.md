@@ -23,19 +23,43 @@ weapon or engagement semantics.
   `infrastructure/keycloak/`). Validate the IdP's JWT in the gateway instead of
   minting tokens.
 
-### Roles (RBAC)
+### Roles (RBAC) & the PolicyEngine
 
 `platform-admin > org-admin > ops-supervisor > operator > analyst > field-user > viewer`.
 
-Reads require any authenticated user; mutations (incidents, tasks, alert ack)
-require **operator+**; the audit log requires **supervisor+**. Enforcement is in
-`routes.ts` via `requireRole`.
+Authorization is centralized in **`@fusion/authorization`** — a single
+`PolicyEngine.can(actor, action, ctx)` with a capability registry
+(`action → minimum role`), not role `if`-statements scattered across routes.
+Every endpoint calls one `can(req, reply, action, ctx)` gate. Reads need
+`*.read`; mutations need `operator+`; `audit.read`/`raw.reprocess` need
+`ops-supervisor+`; `observation/raw/quarantine.read` need `analyst+`.
 
-## Audit (§14)
+### Tenant isolation (§C2)
 
-Every sensitive action writes an `AuditLog` entry: user, action, resource,
-timestamp, IP/session when available, and previous/new values. Exposed at
-`GET /api/audit` (supervisor+).
+`organizationId` propagates through the domain. The PolicyEngine denies
+cross-organization actions unless the actor is `platform-admin`, and every list
+endpoint is filtered to the caller's organization server-side (never trust the
+frontend). The Realtime Gateway only delivers an event to a connection whose
+organization matches. PostgreSQL Row-Level Security is the Phase-D reinforcement.
+
+## Audit V2 (§C4)
+
+Every sensitive action writes an append-only `AuditLog` entry: `auditId`,
+`timestamp`, `actorId`, `actorType`, `action`, `resourceType`, `resourceId`,
+`organizationId`, optional `operationId`/`correlationId`, `previousValue`,
+`newValue`, `sourceIp`, and `result`. Sensitive values (token/password/secret/
+key/jwt, recursively) are **redacted** before storage. Exposed at
+`GET /api/audit` (supervisor+), tenant-filtered.
+
+## Realtime Gateway V2 (§C1)
+
+The WebSocket gateway authenticates on connect (token; bad token → close 4401),
+scopes every connection to its organization, stamps a monotonic **server
+sequence** on each event, buffers a resume ring (clients `RESUME` from a seq),
+runs heartbeat **ping/pong** with disconnect detection, applies **backpressure**
+(drops when the socket buffer is saturated) and inbound **rate limiting**, and
+supports `SUBSCRIBE`/`UNSUBSCRIBE` narrowing by organization/operation/asset/
+track/type. A cross-organization event is never delivered to another tenant.
 
 ## Transport & secrets
 

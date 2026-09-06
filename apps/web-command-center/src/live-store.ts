@@ -67,7 +67,14 @@ class LiveStore {
       setTimeout(() => this.connect(), 1500);
     };
     ws.onerror = () => ws.close();
-    ws.onmessage = (e) => this.apply(JSON.parse(e.data) as ServerMessage | { topic: 'snapshot'; payload: SnapshotPayload });
+    ws.onmessage = (e) => {
+      const raw = JSON.parse(e.data) as { topic?: string };
+      const topic = raw.topic;
+      // Realtime Gateway V2 heartbeat + control frames.
+      if (topic === 'ping') { try { ws.send(JSON.stringify({ type: 'pong' })); } catch { /* ignore */ } return; }
+      if (topic === 'pong' || topic === 'ack' || topic === 'error') return;
+      this.apply(raw as unknown as ServerMessage | { topic: 'snapshot'; payload: SnapshotPayload });
+    };
   }
 
   private pushTrail(id: string, lon: number, lat: number) {
