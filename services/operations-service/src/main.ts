@@ -14,8 +14,9 @@ import { registerRoutes } from './routes.js';
 import { registerRealtime } from './realtime.js';
 import { startAdapters } from './adapters.js';
 import { seedDemo } from './seed.js';
-import { createMemoryRepositories } from './repositories.js';
+import { createRepositories } from './repositories.js';
 import { FusionService } from './fusion.js';
+import { metrics } from '@fusion/observability';
 
 export interface BuiltApp {
   app: FastifyInstance;
@@ -32,21 +33,43 @@ export async function buildApp(): Promise<BuiltApp> {
   await app.register(cors, { origin: config.corsOrigin });
   await app.register(websocket);
 
+  // API latency + request counters (§D3).
+  const reqs = metrics.counter('api_requests_total', 'HTTP requests handled');
+  const latency = metrics.histogram('api_request_duration_ms', 'HTTP request duration (ms)');
+  app.addHook('onResponse', async (req, reply) => {
+    reqs.inc(1, { method: req.method, status: String(reply.statusCode) });
+    latency.observe(reply.elapsedTime, { method: req.method });
+  });
+
+  const busDriver = process.env.BUS_DRIVER ?? 'memory';
+  const repoDriver = process.env.REPO_DRIVER ?? 'memory';
+
   // Health (infra-level). Live = process up. Ready = critical deps initialized.
   app.get('/health/live', async () => ({ status: 'live', ts: Date.now() }));
   app.get('/health/ready', async (_req, reply) => {
     if (!state.ready) return reply.code(503).send({ status: 'starting', ts: Date.now() });
     return {
       status: 'ready', ts: Date.now(),
-      checks: { store: 'ok', bus: 'ok', mode: config.sim.enabled ? 'demo-memory' : 'live' },
+      checks: {
+        store: store.assets.size >= 0 ? 'ok' : 'fail',
+        bus: `ok (${busDriver})`,
+        repositories: `ok (${repoDriver})`,
+        metrics: 'ok',
+        mode: config.sim.enabled ? 'demo-memory' : 'live',
+      },
     };
+  });
+  // Prometheus metrics (unauthenticated scrape endpoint, like /health).
+  app.get('/metrics', async (_req, reply) => {
+    reply.header('content-type', 'text/plain; version=0.0.4');
+    return metrics.render();
   });
 
   const store = new Store(config.defaultOrgId);
-  const bus = createBus();
+  const bus = createBus(busDriver);
   const alerts = new AlertEngine(store, bus);
   const fusion = new FusionService(store, bus);
-  const repositories = createMemoryRepositories(store);
+  const repositories = createRepositories(store, repoDriver);
 
   seedDemo(store);
   registerRoutes(app, store, bus, repositories);
@@ -55,12 +78,18 @@ export async function buildApp(): Promise<BuiltApp> {
 
   // Periodic sweep: age out silent assets (comms-lost alerts) and age tracks
   // through coasting → lost → archived.
+  const gTracks = metrics.gauge('track_count', 'active tracks');
+  const gStale = metrics.gauge('stale_assets', 'assets not currently live');
+  const gAssets = metrics.gauge('asset_count', 'known assets');
   const sweep = setInterval(() => {
     for (const asset of store.refreshLinkStates()) {
       bus.publish(envelope('asset.health', { assetId: asset.id, health: asset.health }));
       alerts.commsLost(asset);
     }
     fusion.sweep();
+    gTracks.set(store.tracks.size);
+    gAssets.set(store.assets.size);
+    gStale.set([...store.assets.values()].filter((a) => a.link !== 'live').length);
   }, 4000);
 
   await app.ready();

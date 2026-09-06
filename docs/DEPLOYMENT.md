@@ -33,6 +33,27 @@ SELECT create_hypertable('telemetry', 'ts');
 SELECT create_hypertable('positions', 'ts');
 ```
 
+## Observability, health & drivers (Phase D)
+
+- **Metrics:** `GET /metrics` exposes Prometheus text (families: `api_requests_total`,
+  `api_request_duration_ms`, `adapter_messages_total`, `validation_failures_total`,
+  `event_bus_published_total`/`_deduplicated_total`, `realtime_clients`,
+  `realtime_dropped_messages_total`, `track_count`, `stale_assets`, `asset_count`).
+  Scrape it with Prometheus; a real OpenTelemetry exporter swaps in behind
+  `@fusion/observability` without changing instrumentation.
+- **Health:** `GET /health/live` (process up) and `GET /health/ready` (component
+  checks: store, bus, repositories, metrics; 503 until initialized). Demo-memory
+  mode is ready with no external infra.
+- **Resilience:** `@fusion/observability` provides `withTimeout`, `retry`
+  (bounded exponential backoff — never infinite), and `CircuitBreaker`; adapters
+  fail in isolation and one failing adapter never crashes the core.
+- **Drivers (behind abstractions):** the event bus (`BUS_DRIVER`, default
+  `memory`; `nats` via `createNatsBus`, JetStream — lazy/optional `nats`) and
+  repositories (`REPO_DRIVER`, default `memory`; Postgres/Timescale via the
+  lazy `pg` scaffold in `repositories-postgres.ts`). No business service imports
+  NATS/Postgres directly. Memory remains the tested dev/test path; the durable
+  drivers are seams, not yet run against a cluster/DB.
+
 ## Production notes
 
 - Put the API behind a gateway/ingress that terminates TLS and validates the

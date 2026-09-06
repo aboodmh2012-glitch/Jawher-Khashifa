@@ -6,6 +6,7 @@
 import { randomUUID } from 'node:crypto';
 import { envelope, newId, type EventMeta } from '@fusion/event-contracts';
 import { validate } from '@fusion/validation';
+import { metrics } from '@fusion/observability';
 import type { Adapter, AdapterContext } from '@fusion/adapter-sdk';
 import { SimFleetAdapter } from '@fusion/adapter-sdk';
 import { SkynodeSimAdapter } from '@fusion/adapter-skynode';
@@ -20,6 +21,7 @@ export function buildContext(store: Store, bus: Bus, alerts: AlertEngine, fusion
   return {
     onRaw(protocol, messageType, payload, ref) {
       // RAW IS ALWAYS JOURNALED BEFORE ANY DERIVED DATA IS PUBLISHED.
+      metrics.counter('adapter_messages_total', 'messages received from adapters').inc(1, { protocol });
       const raw = store.addRawEvent(protocol, messageType, payload, ref);
       return {
         rawEventId: raw.id, correlationId: raw.correlationId,
@@ -32,6 +34,7 @@ export function buildContext(store: Store, bus: Bus, alerts: AlertEngine, fusion
       // Runtime validation at the domain boundary. Invalid → quarantine, never crash.
       const res = validate('telemetry.v1', t);
       if (!res.valid) {
+        metrics.counter('validation_failures_total', 'payloads that failed schema validation').inc(1, { source: provenance?.sourceProtocol ?? 'unknown' });
         store.addQuarantine({
           id: newId(), schemaId: res.schemaId, schemaVersion: res.schemaVersion, errors: res.errors,
           source: provenance?.sourceProtocol ?? 'unknown', rawEventId: provenance?.rawEventId,

@@ -8,6 +8,17 @@
 import type { Repositories } from '@fusion/repositories';
 import type { Store } from './store.js';
 
+/** Driver factory. Memory is the dev/test/demo path; a Postgres/Timescale-backed
+ *  implementation plugs in behind the same interfaces (see repositories-postgres.ts).
+ *  Note: DB-backed repositories are async by nature — adopting them evolves the
+ *  Repositories interface to async variants (a tracked Phase-D follow-up). */
+export function createRepositories(store: Store, driver = process.env.REPO_DRIVER ?? 'memory'): Repositories {
+  if (driver !== 'memory') {
+    console.warn(`[repositories] driver '${driver}' not wired (needs async repositories); using memory.`);
+  }
+  return createMemoryRepositories(store);
+}
+
 export function createMemoryRepositories(store: Store): Repositories {
   return {
     currentState: {

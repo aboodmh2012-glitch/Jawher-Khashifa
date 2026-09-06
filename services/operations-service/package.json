@@ -19,6 +19,7 @@
     "@fusion/adapter-video": "*",
     "@fusion/authorization": "*",
     "@fusion/event-contracts": "*",
+    "@fusion/observability": "*",
     "@fusion/repositories": "*",
     "@fusion/shared-types": "*",
     "@fusion/validation": "*",

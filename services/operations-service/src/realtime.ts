@@ -9,6 +9,7 @@ import type { FastifyInstance } from 'fastify';
 import type { WebSocket } from '@fastify/websocket';
 import type { ServerMessage, SnapshotMsg, ClientMessage, SubscriptionChannel } from '@fusion/event-contracts';
 import { verifyToken } from './auth.js';
+import { metrics } from '@fusion/observability';
 import type { Store } from './store.js';
 import type { Bus } from './bus.js';
 
@@ -35,6 +36,8 @@ export function registerRealtime(app: FastifyInstance, store: Store, bus: Bus): 
   const clients = new Set<Conn>();
   let seq = 0;
   const ring: Array<{ seq: number; org?: string; data: string; msg: ServerMessage }> = [];
+  const gClients = metrics.gauge('realtime_clients', 'connected realtime clients');
+  const cDropped = metrics.counter('realtime_dropped_messages_total', 'messages dropped by backpressure');
 
   bus.subscribe((msg) => {
     seq += 1;
@@ -66,7 +69,7 @@ export function registerRealtime(app: FastifyInstance, store: Store, bus: Bus): 
 
   function safeSend(c: Conn, data: string): void {
     if (c.ws.readyState !== c.ws.OPEN) return;
-    if ((c.ws.bufferedAmount ?? 0) > BUFFER_LIMIT) return; // backpressure — drop
+    if ((c.ws.bufferedAmount ?? 0) > BUFFER_LIMIT) { cDropped.inc(); return; } // backpressure — drop
     try { c.ws.send(data); } catch { /* ignore */ }
   }
 
@@ -83,6 +86,7 @@ export function registerRealtime(app: FastifyInstance, store: Store, bus: Bus): 
       lastPong: Date.now(), window: { count: 0, start: Date.now() },
     };
     clients.add(conn);
+    gClients.set(clients.size);
 
     const snap: SnapshotMsg & { snapshotVersion?: number } = { topic: 'snapshot', ts: Date.now(), payload: store.snapshot(), snapshotVersion: seq };
     try { socket.send(JSON.stringify(snap)); } catch { /* ignore */ }
@@ -95,8 +99,8 @@ export function registerRealtime(app: FastifyInstance, store: Store, bus: Bus): 
       try { m = JSON.parse(raw.toString()); } catch { return; }
       handle(conn, m);
     });
-    socket.on('close', () => clients.delete(conn));
-    socket.on('error', () => clients.delete(conn));
+    socket.on('close', () => { clients.delete(conn); gClients.set(clients.size); });
+    socket.on('error', () => { clients.delete(conn); gClients.set(clients.size); });
   });
 
   function handle(conn: Conn, m: ClientMessage): void {
