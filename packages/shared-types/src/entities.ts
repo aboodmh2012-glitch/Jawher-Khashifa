@@ -235,6 +235,64 @@ export interface Group {
   memberIds: string[];
 }
 
+/** An Observation — something reported by ONE source at ONE time. Immutable.
+ *  Not an Asset, not a Track. The fusion service consumes these. (Phase B fills
+ *  the producing pipeline; the type exists now so repositories can be typed.) */
+export interface Observation {
+  id: string;
+  organizationId: string;
+  operationId?: string;
+  sourceId: string;
+  sensorId?: string;
+  assetId?: string;
+  timestamp: number;
+  position?: { lat: number; lon: number; altitude?: number };
+  velocity?: { speed: number; heading?: number };
+  heading?: number;
+  altitude?: number;
+  classification?: string;
+  identity?: string;
+  confidence: number;        // 0..1
+  quality: DataQuality;
+  rawEventId?: string;
+  correlationId?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export type TrackState = 'tentative' | 'confirmed' | 'coasting' | 'lost' | 'archived';
+
+/** A Track — the platform's fused understanding of an observed entity, for
+ *  situational awareness (NOT targeting). Phase B implements the fusion service. */
+export interface Track {
+  id: string;
+  organizationId: string;
+  operationId?: string;
+  state: TrackState;
+  position: { lat: number; lon: number; altitude?: number };
+  velocity?: { speed: number; heading?: number };
+  heading?: number;
+  altitude?: number;
+  classification: string;
+  identity?: string;
+  confidence: number;        // 0..1
+  quality: DataQuality;
+  firstSeenAt: number;
+  lastSeenAt: number;
+  sourceCount: number;
+  observationIds: string[];
+  metadata?: Record<string, unknown>;
+}
+
+/** Explicit data-quality metadata — never present uncertain data as certain. */
+export interface DataQuality {
+  confidence: number;        // 0..1
+  freshnessMs?: number;
+  accuracy?: number;
+  sourceCount?: number;
+  lastUpdated?: number;
+  state: 'good' | 'degraded' | 'stale' | 'unknown';
+}
+
 /** Declared telemetry channel (Open-MCT-style provider metadata). */
 export interface TelemetryChannel {
   id: string;               // e.g. power.battery

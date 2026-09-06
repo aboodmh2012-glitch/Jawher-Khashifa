@@ -7,8 +7,9 @@ import { randomUUID } from 'node:crypto';
 import type {
   Asset, Alert, Incident, OperationalTask, OpsEvent, Geofence, RouteEntity,
   AuditLog, User, Organization, TelemetrySample, NormalizedTelemetry, LinkState,
-  RawEvent, Operation, Feature, Group, TelemetryChannel,
+  RawEvent, Operation, Feature, Group, TelemetryChannel, Observation, Track,
 } from '@fusion/shared-types';
+import type { QuarantinedEvent } from '@fusion/validation';
 
 const RAW_CAP = 2000; // bounded raw-event journal (in-memory demo; partitioned table in prod)
 
@@ -29,6 +30,9 @@ export class Store {
   groups = new Map<string, Group>();
   channels: TelemetryChannel[] = [];
   rawEvents: RawEvent[] = [];
+  quarantine: QuarantinedEvent[] = [];
+  observations: Observation[] = [];
+  tracks = new Map<string, Track>();
   audit: AuditLog[] = [];
   private telemetry = new Map<string, TelemetrySample[]>();
 
@@ -55,11 +59,16 @@ export class Store {
     asset.link = 'live';
     asset.health = t.health?.state ?? asset.health;
     asset.latest = t;
-    const buf = this.telemetry.get(t.assetId) ?? [];
-    buf.push({ id: randomUUID(), ...t });
-    if (buf.length > TELEMETRY_CAP) buf.shift();
-    this.telemetry.set(t.assetId, buf);
+    this.pushSample({ id: randomUUID(), ...t });
     return asset;
+  }
+
+  /** Append a telemetry sample to the per-asset ring buffer (history writer). */
+  pushSample(sample: TelemetrySample): void {
+    const buf = this.telemetry.get(sample.assetId) ?? [];
+    buf.push(sample);
+    if (buf.length > TELEMETRY_CAP) buf.shift();
+    this.telemetry.set(sample.assetId, buf);
   }
 
   telemetryHistory(assetId: string, from?: number, to?: number): TelemetrySample[] {
@@ -156,6 +165,12 @@ export class Store {
     this.rawEvents.push(raw);
     if (this.rawEvents.length > RAW_CAP) this.rawEvents.shift();
     return raw;
+  }
+
+  addQuarantine(q: QuarantinedEvent): QuarantinedEvent {
+    this.quarantine.push(q);
+    if (this.quarantine.length > 500) this.quarantine.shift();
+    return q;
   }
 
   // ---- operations / features / groups ----

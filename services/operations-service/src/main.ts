@@ -14,6 +14,7 @@ import { registerRoutes } from './routes.js';
 import { registerRealtime } from './realtime.js';
 import { startAdapters } from './adapters.js';
 import { seedDemo } from './seed.js';
+import { createMemoryRepositories } from './repositories.js';
 
 async function main() {
   const app = Fastify({ logger: { level: 'info', transport: undefined } });
@@ -23,9 +24,10 @@ async function main() {
   const store = new Store(config.defaultOrgId);
   const bus = createBus();
   const alerts = new AlertEngine(store, bus);
+  const repositories = createMemoryRepositories(store);
 
   seedDemo(store);
-  registerRoutes(app, store, bus);
+  registerRoutes(app, store, bus, repositories);
   registerRealtime(app, store, bus);
   const stopAdapters = startAdapters(store, bus, alerts);
 

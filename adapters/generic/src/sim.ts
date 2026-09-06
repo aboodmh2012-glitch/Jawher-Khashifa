@@ -70,8 +70,8 @@ export class SimFleetAdapter extends BaseAdapter {
       };
       if (n.type === 'sensor') t.sensors = { state: (Math.random() < 0.05 ? 'degraded' : 'nominal') as SensorState };
       if (n.type === 'camera') t.camera = { state: (Math.random() < 0.1 ? 'recording' : 'streaming') as CameraState, activeStreamId: `${n.id}-primary` };
-      ctx.onRaw?.('SIM', n.type, { id: n.id, lat: n.lat, lon: n.lon, heading: n.heading, speed: n.speed });
-      ctx.onTelemetry(t);
+      const ref = ctx.onRaw('SIM', n.type, { id: n.id, lat: n.lat, lon: n.lon, heading: n.heading, speed: n.speed }, { assetId: n.id, deviceId: n.deviceId });
+      ctx.onTelemetry(t, ref);
     }
   }
 }

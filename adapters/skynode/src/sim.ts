@@ -122,9 +122,10 @@ export class SkynodeSimAdapter extends BaseAdapter {
         sensor_status: 'ok',
         camera_status: 'streaming',
       };
-      // journal the raw Skynode/PX4 message before deriving anything from it
-      ctx.onRaw?.('SKYNODE', 'telemetry', raw);
-      ctx.onTelemetry(normalizeSkynode(raw));
+      // journal the raw Skynode/PX4 message BEFORE deriving anything from it,
+      // then carry provenance forward onto the normalized sample.
+      const ref = ctx.onRaw('SKYNODE', 'telemetry', raw, { assetId: v.vehicleId, deviceId: v.deviceId });
+      ctx.onTelemetry(normalizeSkynode(raw), ref);
     }
   }
 }

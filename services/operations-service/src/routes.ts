@@ -8,6 +8,8 @@ import type { Store } from './store.js';
 import type { Bus } from './bus.js';
 import { verifyToken, signToken, atLeast, type TokenPayload } from './auth.js';
 import { openApiSpec } from './openapi.js';
+import { listSchemas } from '@fusion/validation';
+import type { Repositories } from '@fusion/repositories';
 
 function auth(req: FastifyRequest): TokenPayload | null {
   const header = req.headers.authorization;
@@ -15,7 +17,7 @@ function auth(req: FastifyRequest): TokenPayload | null {
   return verifyToken(token);
 }
 
-export function registerRoutes(app: FastifyInstance, store: Store, bus: Bus): void {
+export function registerRoutes(app: FastifyInstance, store: Store, bus: Bus, repos: Repositories): void {
   app.get('/health', async () => ({ status: 'ok', ts: Date.now() }));
   app.get('/api/openapi.json', async () => openApiSpec);
 
@@ -65,7 +67,7 @@ export function registerRoutes(app: FastifyInstance, store: Store, bus: Bus): vo
     if (!requireAuth(req, reply)) return;
     const { assetId } = req.params as { assetId: string };
     const { from, to } = req.query as { from?: string; to?: string };
-    return store.telemetryHistory(assetId, from ? Number(from) : undefined, to ? Number(to) : undefined);
+    return repos.telemetryHistory.history(assetId, from ? Number(from) : undefined, to ? Number(to) : undefined);
   });
 
   // ---- incidents ----
@@ -162,11 +164,25 @@ export function registerRoutes(app: FastifyInstance, store: Store, bus: Bus): vo
     const limit = Number((req.query as { limit?: string }).limit ?? 100);
     return store.rawEvents.slice(-limit).reverse();
   });
+  // Provenance tracing: follow a correlationId back to its raw journal entries (§2).
+  app.get('/api/raw-events/by-correlation/:cid', async (req, reply) => {
+    const a = requireRole(req, reply, 'analyst'); if (!a) return;
+    return repos.rawEvents.byCorrelation((req.params as { cid: string }).cid);
+  });
+
   app.post('/api/raw-events/reprocess', async (req, reply) => {
     const a = requireRole(req, reply, 'ops-supervisor'); if (!a) return;
     // Seam for replaying the journal through current parsers/normalizers.
     store.addAudit({ userId: a.sub, action: 'raw.reprocess', resource: 'journal' });
     return { journaled: store.rawEvents.length, note: 'reprocess is a Phase-2 batch job (journal is retained for replay)' };
+  });
+
+  // ---- schema registry + quarantine (data quality) ----
+  app.get('/api/schemas', async (req, reply) => requireAuth(req, reply) && listSchemas());
+  app.get('/api/quarantine', async (req, reply) => {
+    const a = requireRole(req, reply, 'analyst'); if (!a) return;
+    const limit = Number((req.query as { limit?: string }).limit ?? 100);
+    return store.quarantine.slice(-limit).reverse();
   });
 
   // ---- events / map / audit / integrations ----

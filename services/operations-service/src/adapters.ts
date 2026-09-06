@@ -3,7 +3,8 @@
 // the demo adapters (§26). Adding a real adapter later = instantiate it here (or
 // load from config) and call start(ctx) — nothing else changes.
 
-import { envelope } from '@fusion/event-contracts';
+import { envelope, newId, type EventMeta } from '@fusion/event-contracts';
+import { validate } from '@fusion/validation';
 import type { Adapter, AdapterContext } from '@fusion/adapter-sdk';
 import { SimFleetAdapter } from '@fusion/adapter-sdk';
 import { SkynodeSimAdapter } from '@fusion/adapter-skynode';
@@ -14,21 +15,45 @@ import { config } from './config.js';
 
 export function buildContext(store: Store, bus: Bus, alerts: AlertEngine): AdapterContext {
   return {
-    onRaw(protocol, messageType, payload) {
-      const p = payload as { id?: string; vehicle_id?: string; device_id?: string };
-      const raw = store.addRawEvent(protocol, messageType, payload, {
-        assetId: p?.vehicle_id ?? p?.id, deviceId: p?.device_id,
-      });
-      return raw.correlationId;
+    onRaw(protocol, messageType, payload, ref) {
+      // RAW IS ALWAYS JOURNALED BEFORE ANY DERIVED DATA IS PUBLISHED.
+      const raw = store.addRawEvent(protocol, messageType, payload, ref);
+      return {
+        rawEventId: raw.id, correlationId: raw.correlationId,
+        sourceProtocol: protocol, sourceMessageType: messageType,
+        receivedAt: raw.receivedAt, parserVersion: raw.parserVersion,
+      };
     },
-    onTelemetry(t) {
+    onTelemetry(t, provenance) {
+      if (provenance) t.provenance = provenance;
+      // Runtime validation at the domain boundary. Invalid → quarantine, never crash.
+      const res = validate('telemetry.v1', t);
+      if (!res.valid) {
+        store.addQuarantine({
+          id: newId(), schemaId: res.schemaId, schemaVersion: res.schemaVersion, errors: res.errors,
+          source: provenance?.sourceProtocol ?? 'unknown', rawEventId: provenance?.rawEventId,
+          correlationId: provenance?.correlationId, payload: t, at: Date.now(),
+        });
+        const ev = store.addEvent('telemetry.quarantined',
+          `Quarantined telemetry from ${provenance?.sourceProtocol ?? 'unknown'}: ${res.errors[0]?.message ?? 'invalid'}`,
+          t.assetId, 'warning');
+        bus.publish(envelope('event', ev));
+        return;
+      }
       const asset = store.applyTelemetry(t);
       if (!asset) return;
+      const meta: EventMeta = {
+        source: provenance?.sourceProtocol ?? 'core',
+        correlationId: provenance?.correlationId,
+        causationId: provenance?.rawEventId,
+        assetId: asset.id,
+        organizationId: asset.orgId,
+      };
       bus.publish(envelope('asset.position', {
         assetId: asset.id, lat: t.position.lat, lon: t.position.lon,
         altitude: t.position.altitude, heading: t.heading, groundSpeed: t.groundSpeed,
-      }));
-      bus.publish(envelope('asset.telemetry', t));
+      }, meta));
+      bus.publish(envelope('asset.telemetry', t, meta));
       alerts.evaluate(asset);
     },
     onAssetUp(seed) {

@@ -18,7 +18,9 @@
     "@fusion/adapter-tak": "*",
     "@fusion/adapter-video": "*",
     "@fusion/event-contracts": "*",
+    "@fusion/repositories": "*",
     "@fusion/shared-types": "*",
+    "@fusion/validation": "*",
     "fastify": "^5.1.0"
   },
   "devDependencies": {

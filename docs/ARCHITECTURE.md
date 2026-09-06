@@ -53,6 +53,36 @@ mode, GPS (fix + sats), battery (V + %), link quality, health (+components),
 mission progress, sensor & camera state, and a `raw` passthrough for audit. Every
 adapter maps into exactly this shape.
 
+## Pipeline invariants (Phase A)
+
+The ingest path enforces production invariants:
+
+```
+adapter → onRaw()  ── RawEvent journaled FIRST (never skipped)
+             │        returns provenance {rawEventId, correlationId, sourceProtocol, ...}
+             ▼
+       onTelemetry(sample, provenance)
+             │  stamp provenance onto the sample
+             ▼
+       validate('telemetry.v1', sample)   (runtime, @fusion/validation)
+             ├── invalid → QuarantinedEvent (stored, never crashes)
+             └── valid   → store + publish Envelope V2
+```
+
+- **Envelope V2** (`@fusion/event-contracts`) carries `eventId`, `correlationId`,
+  `causationId` (= the raw event id), `source`, `occurredAt`/`receivedAt`,
+  `schemaVersion`, and org/op/asset ids. `topic`/`ts` remain as aliases so all
+  existing consumers keep working (backward compatible).
+- **Provenance**: no adapter-derived telemetry exists without a raw-event link.
+  Trace it via `GET /api/raw-events/by-correlation/:cid`.
+- **Runtime validation**: TS types are not trusted at the boundary; payloads are
+  validated against versioned schemas (`telemetry.v1`, …). Invalid → quarantine
+  (`GET /api/quarantine`), inspect schemas via `GET /api/schemas`.
+- **Repository interfaces** (`@fusion/repositories`) sit between business logic
+  and storage; the MVP binds memory implementations over the Store, and
+  PostgreSQL/PostGIS/TimescaleDB implementations swap in behind the same
+  interfaces later.
+
 ## Realtime topics
 
 `asset.position`, `asset.telemetry`, `asset.health`, `asset.connected`,

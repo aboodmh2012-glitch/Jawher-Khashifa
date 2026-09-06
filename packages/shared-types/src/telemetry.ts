@@ -78,4 +78,18 @@ export interface NormalizedTelemetry {
 
   /** carrier for source-specific fields we don't normalize (kept for audit). */
   raw?: Record<string, unknown>;
+
+  /** Provenance — set whenever the sample was derived from an adapter source, so
+   *  every derived value can be traced back to its raw journal entry.
+   *  (raw → correlationId → normalized → track → domain event). */
+  provenance?: TelemetryProvenance;
+}
+
+export interface TelemetryProvenance {
+  rawEventId: string;
+  correlationId: string;
+  sourceProtocol: string;      // MAVLINK | COT | SKYNODE | SIM | ...
+  sourceMessageType: string;
+  receivedAt: number;
+  parserVersion: string;
 }

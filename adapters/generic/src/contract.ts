@@ -5,15 +5,21 @@
 // lifecycle events into the platform through the AdapterContext. This is what
 // keeps the core decoupled from any single autopilot or manufacturer.
 
-import type { Asset, AssetType, NormalizedTelemetry } from '@fusion/shared-types';
+import type { Asset, AssetType, NormalizedTelemetry, TelemetryProvenance } from '@fusion/shared-types';
+
+/** Reference to a journaled raw event, returned by `onRaw` so the adapter can
+ *  attach provenance to the telemetry it derives. */
+export type RawEventRef = TelemetryProvenance;
 
 /** What the platform hands every adapter so it can report upstream. */
 export interface AdapterContext {
   /** Record the original, unparsed source message in the raw journal (replayability).
-   *  Returns a correlationId adapters may attach to the telemetry they derive. */
-  onRaw?(protocol: string, messageType: string, payload: unknown): string;
-  /** Report a normalized telemetry sample (the main data path). */
-  onTelemetry(sample: NormalizedTelemetry): void;
+   *  Returns a provenance ref the adapter passes to `onTelemetry`, so derived data
+   *  is always traceable back to its raw source. */
+  onRaw(protocol: string, messageType: string, payload: unknown, ref?: { assetId?: string; deviceId?: string }): RawEventRef;
+  /** Report a normalized telemetry sample. Pass the raw ref so the platform can
+   *  stamp provenance; adapter-sourced telemetry should always carry it. */
+  onTelemetry(sample: NormalizedTelemetry, provenance?: RawEventRef): void;
   /** Announce/refresh an asset the adapter manages. */
   onAssetUp(asset: AssetSeed): void;
   /** Mark an asset as gone (link lost / device removed). */
