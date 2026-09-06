@@ -11,6 +11,27 @@ const geoPoint = z.object({
   altitude: z.number().optional(),
 });
 
+/** raw-event.v1 — the journaled, unparsed source message envelope. */
+export const rawEventV1 = z.object({
+  id: z.string().min(1),
+  protocol: z.string().min(1),
+  messageType: z.string().min(1),
+  payloadFormat: z.enum(['json', 'xml', 'text', 'binary-base64']),
+  receivedAt: z.number().positive(),
+  parserVersion: z.string().min(1),
+  correlationId: z.string().min(1),
+  deviceId: z.string().optional(),
+  assetId: z.string().optional(),
+}).passthrough();
+
+/** asset.v1 — a registered asset (vendor-neutral). */
+export const assetV1 = z.object({
+  id: z.string().min(1),
+  orgId: z.string().min(1),
+  name: z.string().min(1),
+  type: z.enum(['uav', 'ground-vehicle', 'vessel', 'team', 'sensor', 'camera', 'infrastructure', 'marker']),
+}).passthrough();
+
 /** telemetry.v1 — the normalized, vendor-neutral telemetry sample. */
 export const telemetryV1 = z.object({
   deviceId: z.string().min(1),
@@ -60,6 +81,8 @@ export const incidentV1 = z.object({
 }).passthrough();
 
 export const SCHEMAS = {
+  'raw-event.v1': { version: 1, schema: rawEventV1 },
+  'asset.v1': { version: 1, schema: assetV1 },
   'telemetry.v1': { version: 1, schema: telemetryV1 },
   'observation.v1': { version: 1, schema: observationV1 },
   'track.v1': { version: 1, schema: trackV1 },

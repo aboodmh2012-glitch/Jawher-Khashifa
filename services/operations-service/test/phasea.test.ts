@@ -22,7 +22,12 @@ test('envelope V2: unique ids, correlation propagates, legacy aliases kept', () 
 });
 
 test('validation: valid telemetry passes, invalid is rejected, unknown schema rejected', () => {
-  assert.ok(listSchemas().some((s) => s.id === 'telemetry.v1'));
+  const ids = listSchemas().map((s) => s.id);
+  for (const id of ['raw-event.v1', 'asset.v1', 'telemetry.v1', 'observation.v1', 'track.v1', 'feature.v1', 'incident.v1']) {
+    assert.ok(ids.includes(id), `schema ${id} registered`);
+  }
+  assert.equal(validate('asset.v1', { id: 'A1', orgId: 'o', name: 'U1', type: 'uav' }).valid, true);
+  assert.equal(validate('asset.v1', { id: 'A1', orgId: 'o', name: 'U1', type: 'bogus' }).valid, false);
   const good = validate('telemetry.v1', { deviceId: 'd', assetId: 'A1', timestamp: Date.now(), position: { lat: 24, lon: 54 } });
   assert.equal(good.valid, true);
   const bad = validate('telemetry.v1', { deviceId: 'd', assetId: 'A1', timestamp: Date.now(), position: { lat: 999, lon: 54 } });
