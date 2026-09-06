@@ -6,6 +6,7 @@ import { config } from '../config.js';
 import { assetColor } from '../util.js';
 
 const SEV_COLOR: Record<string, string> = { info: '#3aa0ff', minor: '#8aa0b8', major: '#ff8a3c', critical: '#ff5d57' };
+const TRACK_COLOR: Record<string, string> = { tentative: '#e8a640', confirmed: '#37c6cb', coasting: '#ff8a3c', lost: '#6c8199', archived: '#6c8199' };
 const empty: FeatureCollection = { type: 'FeatureCollection', features: [] };
 
 export function MapView() {
@@ -26,9 +27,13 @@ export function MapView() {
     map.addControl(new maplibregl.AttributionControl({ compact: true }));
 
     map.on('load', () => {
-      for (const id of ['geofences', 'routes', 'features', 'trails', 'headings', 'assets', 'incidents', 'selection']) {
+      for (const id of ['geofences', 'routes', 'features', 'trails', 'headings', 'tracks', 'assets', 'incidents', 'selection']) {
         map.addSource(id, { type: 'geojson', data: empty });
       }
+      // Fused tracks — a hollow ring around the fused position, colored by state.
+      map.addLayer({ id: 'tracks-ring', type: 'circle', source: 'tracks', paint: {
+        'circle-radius': 12, 'circle-color': 'rgba(0,0,0,0)',
+        'circle-stroke-color': ['get', 'color'], 'circle-stroke-width': 1.5, 'circle-opacity': 0.9 } });
       // Operation features (canonical geometry; styling applied here, not stored on the feature)
       map.addLayer({ id: 'features-fill', type: 'fill', source: 'features', filter: ['==', ['geometry-type'], 'Polygon'], paint: { 'fill-color': '#b98cff', 'fill-opacity': 0.08 } });
       map.addLayer({ id: 'features-line', type: 'line', source: 'features', filter: ['in', ['geometry-type'], ['literal', ['LineString', 'Polygon']]], paint: { 'line-color': '#b98cff', 'line-width': 1.6, 'line-opacity': 0.7 } });
@@ -105,6 +110,13 @@ function redraw(map: MLMap) {
     return { type: 'Feature' as const, geometry: { type: 'LineString' as const, coordinates: pts }, properties: { color: a ? assetColor(a.type) : '#6c8199' } };
   });
   src('trails')?.setData({ type: 'FeatureCollection', features: trailFeats });
+
+  const trackFeats = [...live.tracks.values()].filter((t) => t.state !== 'archived').map((t) => ({
+    type: 'Feature' as const,
+    geometry: { type: 'Point' as const, coordinates: [t.position.lon, t.position.lat] },
+    properties: { id: t.id, color: TRACK_COLOR[t.state] ?? '#6c8199' },
+  }));
+  src('tracks')?.setData({ type: 'FeatureCollection', features: trackFeats });
 
   const incFeats = [...live.incidents.values()].filter((i) => i.location && i.status !== 'closed').map((i) => ({
     type: 'Feature' as const, geometry: { type: 'Point' as const, coordinates: [i.location!.lon, i.location!.lat] },

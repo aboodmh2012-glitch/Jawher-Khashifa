@@ -9,7 +9,7 @@
 
 import type {
   Asset, Alert, Incident, OperationalTask, OpsEvent,
-  NormalizedTelemetry, Feature,
+  NormalizedTelemetry, Feature, Track,
 } from '@fusion/shared-types';
 
 /** Canonical topic/type names used on the bus and WS. */
@@ -28,6 +28,10 @@ export const Topics = {
   FeatureCreated: 'feature.created',
   FeatureUpdated: 'feature.updated',
   FeatureDeleted: 'feature.deleted',
+  TrackCreated: 'track.created',
+  TrackUpdated: 'track.updated',
+  TrackCoasting: 'track.coasting',
+  TrackLost: 'track.lost',
   MediaAvailable: 'media.available',
   Event: 'event',
 } as const;
@@ -90,13 +94,17 @@ export type AlertAcknowledgedMsg = EventEnvelope<'alert.acknowledged', Alert>;
 export type FeatureCreatedMsg = EventEnvelope<'feature.created', Feature>;
 export type FeatureUpdatedMsg = EventEnvelope<'feature.updated', Feature>;
 export type FeatureDeletedMsg = EventEnvelope<'feature.deleted', { id: string; operationId: string }>;
+export type TrackCreatedMsg = EventEnvelope<'track.created', Track>;
+export type TrackUpdatedMsg = EventEnvelope<'track.updated', Track>;
+export type TrackCoastingMsg = EventEnvelope<'track.coasting', Track>;
+export type TrackLostMsg = EventEnvelope<'track.lost', Track>;
 export type EventMsg = EventEnvelope<'event', OpsEvent>;
 
 /** A snapshot sent to a client immediately on connect, so the COP hydrates. */
 export interface SnapshotMsg {
   topic: 'snapshot';
   ts: number;
-  payload: { assets: Asset[]; alerts: Alert[]; incidents: Incident[]; events: OpsEvent[]; features: Feature[] };
+  payload: { assets: Asset[]; alerts: Alert[]; incidents: Incident[]; events: OpsEvent[]; features: Feature[]; tracks: Track[] };
 }
 
 export type ServerMessage =
@@ -106,6 +114,7 @@ export type ServerMessage =
   | TaskCreatedMsg | TaskUpdatedMsg
   | AlertCreatedMsg | AlertAcknowledgedMsg
   | FeatureCreatedMsg | FeatureUpdatedMsg | FeatureDeletedMsg
+  | TrackCreatedMsg | TrackUpdatedMsg | TrackCoastingMsg | TrackLostMsg
   | EventMsg | SnapshotMsg;
 
 /** Works in Node 20+ and browsers without importing node:crypto (keeps the

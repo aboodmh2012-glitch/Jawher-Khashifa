@@ -245,7 +245,8 @@ export interface Observation {
   sourceId: string;
   sensorId?: string;
   assetId?: string;
-  timestamp: number;
+  occurredAt: number;        // when the source observed it
+  receivedAt: number;        // when the platform ingested it
   position?: { lat: number; lon: number; altitude?: number };
   velocity?: { speed: number; heading?: number };
   heading?: number;

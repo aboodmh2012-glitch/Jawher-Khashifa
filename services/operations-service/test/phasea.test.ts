@@ -7,6 +7,7 @@ import { createBus } from '../src/bus.js';
 import { AlertEngine } from '../src/alerts.js';
 import { buildContext } from '../src/adapters.js';
 import { createMemoryRepositories } from '../src/repositories.js';
+import { FusionService } from '../src/fusion.js';
 import type { NormalizedTelemetry } from '@fusion/shared-types';
 
 test('envelope V2: unique ids, correlation propagates, legacy aliases kept', () => {
@@ -41,7 +42,8 @@ function fixture() {
   store.upsertAssetSeed({ id: 'A1', name: 'Unit 1', type: 'uav' });
   const bus = createBus();
   const alerts = new AlertEngine(store, bus);
-  const ctx = buildContext(store, bus, alerts);
+  const fusion = new FusionService(store, bus);
+  const ctx = buildContext(store, bus, alerts, fusion);
   return { store, ctx };
 }
 

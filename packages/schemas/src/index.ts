@@ -69,7 +69,8 @@ export const NormalizedTelemetrySchema = z.object({
 export const ObservationSchema = z.object({
   id: z.string().min(1),
   sourceId: z.string().min(1),
-  timestamp: z.number().positive(),
+  occurredAt: z.number().positive(),
+  receivedAt: z.number().positive(),
   position: geoPoint.optional(),
   confidence: z.number().min(0).max(1),
   rawEventId: z.string().optional(),

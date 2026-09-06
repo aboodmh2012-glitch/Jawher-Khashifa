@@ -210,6 +210,7 @@ export class Store {
       incidents: [...this.incidents.values()],
       events: this.events.slice(0, 60),
       features: [...this.features.values()],
+      tracks: [...this.tracks.values()],
     };
   }
 }

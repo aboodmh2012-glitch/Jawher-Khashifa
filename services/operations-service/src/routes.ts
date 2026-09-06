@@ -10,6 +10,7 @@ import { verifyToken, signToken, atLeast, type TokenPayload } from './auth.js';
 import { openApiSpec } from './openapi.js';
 import { listSchemas } from '@fusion/validation';
 import type { Repositories } from '@fusion/repositories';
+import { buildOperationalPicture, parsePictureFilter } from './operational-picture.js';
 
 function auth(req: FastifyRequest): TokenPayload | null {
   const header = req.headers.authorization;
@@ -175,6 +176,22 @@ export function registerRoutes(app: FastifyInstance, store: Store, bus: Bus, rep
     // Seam for replaying the journal through current parsers/normalizers.
     store.addAudit({ userId: a.sub, action: 'raw.reprocess', resource: 'journal' });
     return { journaled: store.rawEvents.length, note: 'reprocess is a Phase-2 batch job (journal is retained for replay)' };
+  });
+
+  // ---- recognized operational picture / tracks / observations (Phase B) ----
+  app.get('/api/operational-picture', async (req, reply) => {
+    if (!requireAuth(req, reply)) return;
+    return buildOperationalPicture(store, parsePictureFilter(req.query as Record<string, string | undefined>));
+  });
+  app.get('/api/tracks', async (req, reply) => {
+    if (!requireAuth(req, reply)) return;
+    const { state } = req.query as { state?: string };
+    return [...store.tracks.values()].filter((t) => !state || t.state === state);
+  });
+  app.get('/api/observations', async (req, reply) => {
+    const a = requireRole(req, reply, 'analyst'); if (!a) return;
+    const limit = Number((req.query as { limit?: string }).limit ?? 100);
+    return store.observations.slice(-limit).reverse();
   });
 
   // ---- schema registry + quarantine (data quality) ----

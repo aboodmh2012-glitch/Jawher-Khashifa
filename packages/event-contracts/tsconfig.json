@@ -1,11 +1,5 @@
 {
   "extends": "../../tsconfig.base.json",
-  "compilerOptions": {
-    "rootDir": "src",
-    "noEmit": true,
-    "paths": {
-      "@fusion/shared-types": ["../shared-types/src/index.ts"]
-    }
-  },
+  "compilerOptions": { "noEmit": true },
   "include": ["src"]
 }

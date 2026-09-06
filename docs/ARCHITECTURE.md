@@ -83,6 +83,29 @@ adapter → onRaw()  ── RawEvent journaled FIRST (never skipped)
   PostgreSQL/PostGIS/TimescaleDB implementations swap in behind the same
   interfaces later.
 
+## Fusion & operational picture (Phase B)
+
+Validated telemetry becomes an immutable **Observation** (what one source saw at
+one time, provenance-linked), which the **FusionService** folds into **Tracks**
+(the platform's fused, situational-awareness understanding — never targeting):
+
+```
+telemetry → Observation ──► FusionService
+                              ├─ associate (by assetId; dedup → one track/asset)
+                              ├─ update kinematics + sourceCount
+                              ├─ confidence (freshness + sources, 0..1) + DataQuality
+                              └─ lifecycle: tentative → confirmed → coasting → lost → archived
+                                   (sweep ages silent tracks; re-acquisition restores)
+publishes track.created / track.updated / track.coasting / track.lost
+```
+
+The **Operational Picture service** assembles the authoritative
+`OperationalPictureSnapshot` on the backend (assets, tracks, incidents, tasks,
+features, alerts, operations, systemStatus) with org/operation/bbox/type/state
+filtering — the Command Center renders it and never computes global truth.
+The fusion algorithm pieces (`TrackAssociator`, `TrackUpdater`,
+`ConfidenceCalculator`) are interfaces, replaceable without touching callers.
+
 ## Realtime topics
 
 `asset.position`, `asset.telemetry`, `asset.health`, `asset.connected`,

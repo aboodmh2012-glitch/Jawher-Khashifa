@@ -15,6 +15,7 @@ import { registerRealtime } from './realtime.js';
 import { startAdapters } from './adapters.js';
 import { seedDemo } from './seed.js';
 import { createMemoryRepositories } from './repositories.js';
+import { FusionService } from './fusion.js';
 
 export interface BuiltApp {
   app: FastifyInstance;
@@ -44,19 +45,22 @@ export async function buildApp(): Promise<BuiltApp> {
   const store = new Store(config.defaultOrgId);
   const bus = createBus();
   const alerts = new AlertEngine(store, bus);
+  const fusion = new FusionService(store, bus);
   const repositories = createMemoryRepositories(store);
 
   seedDemo(store);
   registerRoutes(app, store, bus, repositories);
   registerRealtime(app, store, bus);
-  const stopAdapters = startAdapters(store, bus, alerts);
+  const stopAdapters = startAdapters(store, bus, alerts, fusion);
 
-  // Link-state sweep: age out silent assets and drive comms-lost alerts.
+  // Periodic sweep: age out silent assets (comms-lost alerts) and age tracks
+  // through coasting → lost → archived.
   const sweep = setInterval(() => {
     for (const asset of store.refreshLinkStates()) {
       bus.publish(envelope('asset.health', { assetId: asset.id, health: asset.health }));
       alerts.commsLost(asset);
     }
+    fusion.sweep();
   }, 4000);
 
   await app.ready();

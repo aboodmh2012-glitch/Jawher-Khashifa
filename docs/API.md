@@ -26,6 +26,16 @@ All `/api/*` routes except `/api/auth/login` require `Authorization: Bearer <tok
 | GET | `/api/assets/:id` | one asset |
 | GET | `/api/telemetry/:assetId?from&to` | buffered telemetry history |
 
+## Operational picture / tracks / observations (Phase B)
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/api/operational-picture` | authoritative backend snapshot (assets, tracks, incidents, tasks, features, alerts, operations, systemStatus). Filters: `organizationId`, `operationId`, `assetType`, `trackState`, `bbox=w,s,e,n` |
+| GET | `/api/tracks` | fused tracks; optional `?state=tentative\|confirmed\|coasting\|lost` |
+| GET | `/api/observations` | immutable observations, provenance-linked (analyst+) |
+
+Tracks stream over WebSocket as `track.created` / `track.updated` / `track.coasting` /
+`track.lost`, and are included in the connect `snapshot`.
+
 ## Incidents / tasks
 | Method | Path | Role |
 |---|---|---|
