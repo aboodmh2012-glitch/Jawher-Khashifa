@@ -47,7 +47,7 @@ test('track history stores immutable snapshots', () => {
 test('brief summarizes quality without inventing conclusions', () => {
   const store = new Store('org-a');
   const core = new IntelligenceCore(store);
-  store.upsertAssetSeed({ id: 'a1', name: 'Asset 1', type: 'vehicle' });
+  store.upsertAssetSeed({ id: 'a1', name: 'Asset 1', type: 'ground-vehicle' });
   store.observations.push({
     id: 'o1', organizationId: 'org-a', sourceId: 'SIM', assetId: 'a1',
     occurredAt: Date.now(), receivedAt: Date.now(), position: { lat: 1, lon: 2 },
