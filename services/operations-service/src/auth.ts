@@ -38,8 +38,5 @@ export function verifyToken(token: string | undefined): TokenPayload | null {
   }
 }
 
-/** Coarse role ranking for RBAC checks. */
-const RANK: Record<Role, number> = {
-  viewer: 0, 'field-user': 1, analyst: 2, operator: 3, 'ops-supervisor': 4, 'org-admin': 5, 'platform-admin': 6,
-};
-export function atLeast(role: Role, min: Role): boolean { return RANK[role] >= RANK[min]; }
+// Role ranking / capability checks live in @fusion/authorization (PolicyEngine) —
+// this module only mints/verifies tokens, so no duplicate RBAC logic here.

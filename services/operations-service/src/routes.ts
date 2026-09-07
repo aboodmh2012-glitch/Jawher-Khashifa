@@ -128,8 +128,8 @@ export function registerRoutes(app: FastifyInstance, store: Store, bus: Bus, rep
     const body = req.body as { title: string; type: string; severity: 'info' | 'minor' | 'major' | 'critical'; location?: { lat: number; lon: number }; description?: string };
     const inc = store.addIncident(body);
     store.addAudit({ actorId: a.sub, action: 'incident.create', resourceType: 'incident', resourceId: inc.id, sourceIp: req.ip, newValue: inc });
-    bus.publish(envelope('incident.created', inc));
-    bus.publish(envelope('event', store.addEvent('incident.created', `Incident: ${inc.title}`, inc.id, inc.severity === 'critical' ? 'critical' : 'warning')));
+    bus.publish(envelope('incident.created', inc, { organizationId: inc.orgId }));
+    bus.publish(envelope('event', store.addEvent('incident.created', `Incident: ${inc.title}`, inc.id, inc.severity === 'critical' ? 'critical' : 'warning'), { organizationId: inc.orgId }));
     return reply.code(201).send(inc);
   });
   app.patch('/api/incidents/:id', async (req, reply) => {
@@ -140,7 +140,7 @@ export function registerRoutes(app: FastifyInstance, store: Store, bus: Bus, rep
     const inc = store.updateIncident(id, { status: patch.status }, patch.note);
     if (!inc) return reply.code(404).send({ error: 'not found' });
     store.addAudit({ actorId: a.sub, action: 'incident.update', resourceType: 'incident', resourceId: id, sourceIp: req.ip, previousValue: before?.status, newValue: inc.status });
-    bus.publish(envelope('incident.updated', inc));
+    bus.publish(envelope('incident.updated', inc, { organizationId: inc.orgId }));
     return inc;
   });
 
@@ -154,7 +154,7 @@ export function registerRoutes(app: FastifyInstance, store: Store, bus: Bus, rep
     const a = can(req, reply, 'task.create'); if (!a) return;
     const task = store.addTask(req.body as Parameters<typeof store.addTask>[0]);
     store.addAudit({ actorId: a.sub, action: 'task.create', resourceType: 'task', resourceId: task.id, sourceIp: req.ip, newValue: task });
-    bus.publish(envelope('task.created', task));
+    bus.publish(envelope('task.created', task, { organizationId: task.orgId }));
     return reply.code(201).send(task);
   });
   app.patch('/api/tasks/:id', async (req, reply) => {
@@ -163,7 +163,7 @@ export function registerRoutes(app: FastifyInstance, store: Store, bus: Bus, rep
     const task = store.updateTask(id, req.body as object);
     if (!task) return reply.code(404).send({ error: 'not found' });
     store.addAudit({ actorId: a.sub, action: 'task.update', resourceType: 'task', resourceId: id, sourceIp: req.ip, newValue: task });
-    bus.publish(envelope('task.updated', task));
+    bus.publish(envelope('task.updated', task, { organizationId: task.orgId }));
     return task;
   });
 
@@ -180,7 +180,7 @@ export function registerRoutes(app: FastifyInstance, store: Store, bus: Bus, rep
     const alert = store.ackAlert(id, a.sub, notes);
     if (!alert) return reply.code(404).send({ error: 'not found' });
     store.addAudit({ actorId: a.sub, action: 'alert.ack', resourceType: 'alert', resourceId: id, sourceIp: req.ip });
-    bus.publish(envelope('alert.acknowledged', alert));
+    bus.publish(envelope('alert.acknowledged', alert, { organizationId: alert.orgId }));
     return alert;
   });
 
@@ -202,7 +202,7 @@ export function registerRoutes(app: FastifyInstance, store: Store, bus: Bus, rep
     const a = can(req, reply, 'feature.create'); if (!a) return;
     const feat = store.addFeature(req.body as Parameters<typeof store.addFeature>[0]);
     store.addAudit({ actorId: a.sub, action: 'feature.create', resourceType: 'feature', resourceId: feat.id, operationId: feat.operationId, sourceIp: req.ip, newValue: feat });
-    bus.publish(envelope('feature.created', feat));
+    bus.publish(envelope('feature.created', feat, { organizationId: feat.orgId, operationId: feat.operationId }));
     return reply.code(201).send(feat);
   });
   app.patch('/api/features/:id', async (req, reply) => {
@@ -210,7 +210,7 @@ export function registerRoutes(app: FastifyInstance, store: Store, bus: Bus, rep
     const feat = store.updateFeature((req.params as { id: string }).id, req.body as object);
     if (!feat) return reply.code(404).send({ error: 'not found' });
     store.addAudit({ actorId: a.sub, action: 'feature.update', resourceType: 'feature', resourceId: feat.id, operationId: feat.operationId, sourceIp: req.ip });
-    bus.publish(envelope('feature.updated', feat));
+    bus.publish(envelope('feature.updated', feat, { organizationId: feat.orgId, operationId: feat.operationId }));
     return feat;
   });
   app.delete('/api/features/:id', async (req, reply) => {
@@ -219,7 +219,7 @@ export function registerRoutes(app: FastifyInstance, store: Store, bus: Bus, rep
     const feat = store.features.get(id);
     if (!store.deleteFeature(id)) return reply.code(404).send({ error: 'not found' });
     store.addAudit({ actorId: a.sub, action: 'feature.delete', resourceType: 'feature', resourceId: id, operationId: feat?.operationId, sourceIp: req.ip });
-    bus.publish(envelope('feature.deleted', { id, operationId: feat?.operationId ?? '' }));
+    bus.publish(envelope('feature.deleted', { id, operationId: feat?.operationId ?? '' }, { organizationId: feat?.orgId ?? a.orgId, operationId: feat?.operationId }));
     return reply.code(204).send();
   });
 
