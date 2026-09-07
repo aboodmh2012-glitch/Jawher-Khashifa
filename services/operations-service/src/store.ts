@@ -32,7 +32,27 @@ export class Store {
   audit: AuditLog[] = [];
   private telemetry = new Map<string, TelemetrySample[]>();
 
-  constructor(private orgId: string) {}
+  constructor(readonly orgId: string) {}
+
+  private persistRecord?: (kind: 'raw' | 'audit', value: unknown) => void;
+  setJournal(writer: (kind: 'raw' | 'audit', value: unknown) => void) { this.persistRecord = writer; }
+
+  exportState() {
+    return { version: 1, orgId: this.orgId,
+      maps: { orgs: [...this.orgs], users: [...this.users], assets: [...this.assets], incidents: [...this.incidents],
+        tasks: [...this.tasks], alerts: [...this.alerts], geofences: [...this.geofences], routes: [...this.routes],
+        operations: [...this.operations], features: [...this.features], groups: [...this.groups], telemetry: [...this.telemetry] },
+      events: this.events, channels: this.channels, rawEvents: this.rawEvents, audit: this.audit };
+  }
+  restoreState(state: ReturnType<Store['exportState']>) {
+    if (state.version !== 1 || state.orgId !== this.orgId) throw new Error('Incompatible state version or organization');
+    this.orgs = new Map(state.maps.orgs); this.users = new Map(state.maps.users); this.assets = new Map(state.maps.assets);
+    this.incidents = new Map(state.maps.incidents); this.tasks = new Map(state.maps.tasks); this.alerts = new Map(state.maps.alerts);
+    this.geofences = new Map(state.maps.geofences); this.routes = new Map(state.maps.routes); this.operations = new Map(state.maps.operations);
+    this.features = new Map(state.maps.features); this.groups = new Map(state.maps.groups); this.telemetry = new Map(state.maps.telemetry);
+    this.events = state.events; this.channels = state.channels; this.rawEvents = state.rawEvents; this.audit = state.audit;
+    this.refreshLinkStates();
+  }
 
   // ---- assets ----
   upsertAssetSeed(seed: { id: string; name: string; type: Asset['type']; deviceId?: string; orgId?: string; tags?: string[] }): Asset {
@@ -49,22 +69,28 @@ export class Store {
   applyTelemetry(t: NormalizedTelemetry): Asset | null {
     const asset = this.assets.get(t.assetId);
     if (!asset) return null;
-    asset.position = t.position;
-    asset.heading = t.heading ?? asset.heading;
-    asset.lastSeen = t.timestamp;
-    asset.link = 'live';
-    asset.health = t.health?.state ?? asset.health;
-    asset.latest = t;
+    if (!Number.isFinite(t.timestamp) || t.timestamp < 0 || t.timestamp > Date.now() + 60_000 ||
+        !Number.isFinite(t.position?.lat) || Math.abs(t.position.lat) > 90 ||
+        !Number.isFinite(t.position?.lon) || Math.abs(t.position.lon) > 180) return null;
     const buf = this.telemetry.get(t.assetId) ?? [];
-    buf.push({ id: randomUUID(), ...t });
+    if (buf.some(s => s.timestamp === t.timestamp && s.deviceId === t.deviceId)) return null;
+    buf.push({ id: randomUUID(), ...structuredClone(t) });
+    buf.sort((a, b) => a.timestamp - b.timestamp);
     if (buf.length > TELEMETRY_CAP) buf.shift();
     this.telemetry.set(t.assetId, buf);
+    if (asset.latest && t.timestamp <= asset.latest.timestamp) return null;
+    asset.position = { ...t.position };
+    asset.heading = t.heading ?? asset.heading;
+    asset.lastSeen = Date.now(); // receive time determines link freshness; source time orders samples
+    asset.link = 'live';
+    asset.health = t.health?.state ?? asset.health;
+    asset.latest = structuredClone(t);
     return asset;
   }
 
   telemetryHistory(assetId: string, from?: number, to?: number): TelemetrySample[] {
     const buf = this.telemetry.get(assetId) ?? [];
-    return buf.filter((s) => (from ? s.timestamp >= from : true) && (to ? s.timestamp <= to : true));
+    return buf.filter((s) => (from !== undefined ? s.timestamp >= from : true) && (to !== undefined ? s.timestamp <= to : true));
   }
 
   /** Age out link state for assets we haven't heard from (§21). */
@@ -140,7 +166,9 @@ export class Store {
 
   addAudit(entry: Omit<AuditLog, 'id' | 'orgId' | 'at'>): AuditLog {
     const log: AuditLog = { id: randomUUID(), orgId: this.orgId, at: Date.now(), ...entry };
-    this.audit.unshift(log);
+    const immutable = structuredClone(log);
+    this.persistRecord?.('audit', immutable);
+    this.audit.unshift(immutable);
     if (this.audit.length > 1000) this.audit.pop();
     return log;
   }
@@ -148,11 +176,13 @@ export class Store {
   // ---- raw-event journal (replayability) ----
   addRawEvent(protocol: string, messageType: string, payload: unknown, ref?: { deviceId?: string; assetId?: string }): RawEvent {
     const raw: RawEvent = {
-      id: randomUUID(), protocol, messageType, payload,
+      id: randomUUID(), orgId: this.orgId, protocol, messageType, payload,
       payloadFormat: typeof payload === 'string' ? 'text' : 'json',
       receivedAt: Date.now(), parserVersion: '0.1.0', correlationId: randomUUID(),
       deviceId: ref?.deviceId, assetId: ref?.assetId,
     };
+    raw.payload = structuredClone(payload);
+    this.persistRecord?.('raw', raw);
     this.rawEvents.push(raw);
     if (this.rawEvents.length > RAW_CAP) this.rawEvents.shift();
     return raw;
@@ -193,6 +223,7 @@ export class Store {
       assets: [...this.assets.values()],
       alerts: [...this.alerts.values()].filter((a) => a.status !== 'resolved').slice(0, 100),
       incidents: [...this.incidents.values()],
+      tasks: [...this.tasks.values()],
       events: this.events.slice(0, 60),
       features: [...this.features.values()],
     };

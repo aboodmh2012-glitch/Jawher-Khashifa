@@ -17,11 +17,10 @@ weapon or engagement semantics.
 
 ## Identity & access (§14)
 
-- **MVP:** a signed, expiring bearer token (`services/operations-service/src/auth.ts`)
-  carries identity + role. Demo login accepts any password for the seeded users.
-- **Production:** replace with **Keycloak / OIDC** (realm in
-  `infrastructure/keycloak/`). Validate the IdP's JWT in the gateway instead of
-  minting tokens.
+- **Demo:** signed, expiring tokens and a checked demo password; disabled in production.
+- **OIDC:** API validates signature, issuer, audience, expiry and application claims; browser uses PKCE. See [release readiness](RELEASE_READINESS.md) for claim provisioning and untested deployment gates.
+- **Isolation:** one organization per process, checked on REST and WebSocket. No shared multi-tenant store is claimed.
+- **WebSocket:** first authentication frame required before snapshot; origin/payload/buffer limits, expiry closure, no tokens in URLs.
 
 ### Roles (RBAC)
 

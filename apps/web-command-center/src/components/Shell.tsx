@@ -1,3 +1,4 @@
+import { Insights } from './Insights.js';
 import { useState } from 'react';
 import type { User } from '@fusion/shared-types';
 import { live } from '../live-store.js';
@@ -11,9 +12,10 @@ import { AlertsPanel } from './AlertsPanel.js';
 import { Timeline } from './Timeline.js';
 import { AssetsList, IncidentsList, TasksList } from './ListViews.js';
 
-export type View = 'overview' | 'map' | 'assets' | 'incidents' | 'tasks' | 'video' | 'telemetry' | 'comms' | 'history' | 'admin';
+export type View = 'insights' | 'overview' | 'map' | 'assets' | 'incidents' | 'tasks' | 'video' | 'telemetry' | 'comms' | 'history' | 'admin';
 
 const NAV: Array<{ id: View; label: string; icon: keyof typeof Icon }> = [
+  { id: 'insights', label: 'Operations brief', icon: 'overview' },
   { id: 'overview', label: 'Overview', icon: 'overview' },
   { id: 'map', label: 'Map', icon: 'map' },
   { id: 'assets', label: 'Assets', icon: 'assets' },
@@ -32,6 +34,7 @@ export function Shell({ user, onLogout }: { user: User; onLogout: () => void }) 
   const selected = live.selectedId ? live.assets.get(live.selectedId) : undefined;
   const openAlerts = [...live.alerts.values()].filter((a) => a.status === 'open').length;
 
+  const canAct = ['operator','ops-supervisor','org-admin','platform-admin'].includes(user.role);
   const isOps = view === 'overview' || view === 'map';
 
   return (
@@ -55,13 +58,14 @@ export function Shell({ user, onLogout }: { user: User; onLogout: () => void }) 
         <MapView />
 
         {isOps && <Kpis />}
+        {view === 'insights' && <Insights />}
         {view === 'assets' && <AssetsList />}
         {view === 'incidents' && <IncidentsList />}
         {view === 'tasks' && <TasksList />}
 
         {(isOps || view === 'assets' || view === 'telemetry') && (
-          selected ? <AssetPanel asset={selected} canAct={user.role !== 'viewer'} />
-            : isOps ? <AlertsPanel canAct={user.role !== 'viewer'} /> : null
+          selected ? <AssetPanel asset={selected} canAct={canAct} />
+            : isOps ? <AlertsPanel canAct={canAct} /> : null
         )}
 
         {(isOps || view === 'assets') && <Timeline />}

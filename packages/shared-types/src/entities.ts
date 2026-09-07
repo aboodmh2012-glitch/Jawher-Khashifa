@@ -168,6 +168,7 @@ export interface AuthSession {
  */
 export interface RawEvent {
   id: string;
+  orgId?: string;
   deviceId?: string;
   assetId?: string;
   protocol: string;          // MAVLINK | COT | GPS | SIM | ...

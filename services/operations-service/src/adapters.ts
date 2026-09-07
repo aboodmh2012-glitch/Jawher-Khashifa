@@ -30,8 +30,10 @@ export function buildContext(store: Store, bus: Bus, alerts: AlertEngine): Adapt
       }));
       bus.publish(envelope('asset.telemetry', t));
       alerts.evaluate(asset);
+      alerts.commsLost(asset);
     },
     onAssetUp(seed) {
+      if (seed.orgId && seed.orgId !== store.orgId) throw new Error('Adapter organization mismatch');
       const asset = store.upsertAssetSeed(seed);
       bus.publish(envelope('asset.connected', { asset }));
     },

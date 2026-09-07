@@ -25,10 +25,10 @@
                                                   └ bus ──► WebSocket hub       MCT — future)
 ```
 
-1. An adapter calls `ctx.onTelemetry(normalized)`.
+1. An adapter journals the original source through `ctx.onRaw`, then calls `ctx.onTelemetry(normalized)` with its correlation ID.
 2. The service updates the in-memory store, publishes `asset.position` +
    `asset.telemetry` on the bus, and runs the alert engine.
-3. The WebSocket hub forwards every bus message to connected COPs, which update
+3. The WebSocket hub forwards messages only to authenticated, same-organization COPs, which update
    the map and panels.
 
 ## Services (current & target)
@@ -78,3 +78,5 @@ while panels/lists subscribe through a throttled `useSyncExternalStore` hook so
 | 5 | video architecture, history, replay | scaffolded |
 | 6 | TAK adapter, Open MCT, Matrix | seams in place |
 | 7 | offline sync, plugin SDK, multi-org, observability, deploy | planned |
+
+Current guarantees, file-storage limits and unfinished modules: [RELEASE_READINESS.md](RELEASE_READINESS.md). The table above describes the original MVP; the reliability increment does not complete Phases 5–7.

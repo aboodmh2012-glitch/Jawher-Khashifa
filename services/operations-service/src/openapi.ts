@@ -12,7 +12,7 @@ export const openApiSpec = {
   security: [{ bearerAuth: [] }],
   paths: {
     '/health': { get: { summary: 'Liveness', security: [], responses: { 200: { description: 'ok' } } } },
-    '/api/auth/login': { post: { summary: 'Login (demo: any password)', security: [], responses: { 200: { description: 'token + user' }, 401: { description: 'invalid' } } } },
+    '/api/auth/login': { post: { summary: 'Demo login (password required; unavailable in OIDC mode)', security: [], responses: { 200: { description: 'token + user' }, 401: { description: 'invalid' } } } },
     '/api/auth/me': { get: { summary: 'Current user' } },
     '/api/assets': { get: { summary: 'List assets' } },
     '/api/assets/{id}': { get: { summary: 'Get asset' } },

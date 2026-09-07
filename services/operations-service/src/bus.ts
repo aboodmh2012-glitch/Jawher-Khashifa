@@ -23,7 +23,7 @@ class MemoryBus implements Bus {
 export function createBus(driver = process.env.BUS_DRIVER ?? 'memory'): Bus {
   // 'nats' | 'mqtt' drivers plug in here in Phase 7.
   if (driver !== 'memory') {
-    console.warn(`[bus] driver '${driver}' not bundled in MVP; using memory bus.`);
+    throw new Error(`Bus driver '${driver}' is not implemented; select memory explicitly.`);
   }
   return new MemoryBus();
 }

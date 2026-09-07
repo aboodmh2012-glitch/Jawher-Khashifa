@@ -24,6 +24,7 @@ export function signToken(user: User, ttlMs = 8 * 3600_000): { token: string; ex
 
 export function verifyToken(token: string | undefined): TokenPayload | null {
   if (!token) return null;
+  if (token.length > 8192 || token.split('.').length !== 2) return null;
   const [body, sig] = token.split('.');
   if (!body || !sig) return null;
   const expected = sign(body);
@@ -31,7 +32,9 @@ export function verifyToken(token: string | undefined): TokenPayload | null {
   if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
   try {
     const payload = JSON.parse(unb64(body)) as TokenPayload;
-    if (payload.exp < Date.now()) return null;
+    if (!payload || typeof payload.sub !== 'string' || !payload.sub ||
+        typeof payload.orgId !== 'string' || !payload.orgId ||
+        !Object.hasOwn(RANK, payload.role) || !Number.isFinite(payload.exp) || payload.exp <= Date.now()) return null;
     return payload;
   } catch {
     return null;
@@ -43,3 +46,27 @@ const RANK: Record<Role, number> = {
   viewer: 0, 'field-user': 1, analyst: 2, operator: 3, 'ops-supervisor': 4, 'org-admin': 5, 'platform-admin': 6,
 };
 export function atLeast(role: Role, min: Role): boolean { return RANK[role] >= RANK[min]; }
+
+
+// OIDC access tokens use asymmetric signatures and explicit audience/issuer checks.
+import { createRemoteJWKSet, jwtVerify } from 'jose';
+const jwks = config.oidcJwksUrl ? createRemoteJWKSet(new URL(config.oidcJwksUrl)) : undefined;
+export async function authenticate(token: string | undefined): Promise<TokenPayload | null> {
+  if (config.authMode === 'demo') return verifyToken(token);
+  if (!token || token.length > 16384 || !jwks) return null;
+  try {
+    const { payload } = await jwtVerify(token, jwks, {
+      issuer: config.oidcIssuer, audience: config.oidcAudience, algorithms: ['RS256', 'ES256'],
+      requiredClaims: ['sub', 'exp', 'iat', 'orgId', 'role'],
+    });
+    if (typeof payload.sub !== 'string' || !payload.sub || typeof payload.orgId !== 'string' ||
+        typeof payload.role !== 'string' || !Object.hasOwn(RANK, payload.role)) return null;
+    return { sub: payload.sub, role: payload.role as Role, orgId: payload.orgId, exp: payload.exp! * 1000 };
+  } catch { return null; }
+}
+
+export function validDemoPassword(password: unknown): boolean {
+  if (typeof password !== 'string' || password.length > 1024) return false;
+  const digest = (s: string) => createHmac('sha256', config.jwtSecret).update(s).digest();
+  return timingSafeEqual(digest(password), digest(config.demoPassword));
+}

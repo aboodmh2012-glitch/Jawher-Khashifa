@@ -10,3 +10,6 @@ coverage/
 *.tsbuildinfo
 minio-data/
 pgdata/
+
+# Local persistent runtime state and archives
+**/data/

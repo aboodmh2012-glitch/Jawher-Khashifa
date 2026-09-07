@@ -51,3 +51,16 @@ Normalized telemetry is exposed so NASA Open MCT can be fed later without
 duplicating its source: point an Open MCT telemetry adapter at
 `GET /api/telemetry/:assetId` (historical) and the WebSocket `asset.telemetry`
 topic (realtime). Object identifiers map to `assetId`.
+
+
+## Reliability increment changes
+
+- All `/api/*` endpoints except `/api/auth/config` and `/api/auth/login` require a Bearer header. URL tokens are rejected.
+- `GET /api/auth/config` returns `{ "mode": "demo" | "oidc" }`.
+- `POST /api/auth/login` requires a valid demo password; absent in OIDC mode (404).
+- `GET /api/insights` returns a read-only `OperationalBrief` with source record IDs.
+- `PATCH /api/features/:id` requires `expectedVersion`; mismatches return 409.
+- `POST /api/raw-events/reprocess` returns 501 until a replay worker exists.
+- `/ws`: send `{ "type": "auth", "token": "..." }` as the first frame within five seconds. Snapshot follows successful authentication and includes tasks. No query token.
+- Mutations reject unknown fields and invalid geometry. Tenant/identity fields are server-owned.
+- The old hand-authored OpenAPI is a partial index; runtime schemas in validation.ts are authoritative. Complete generated documentation remains a release gate.

@@ -6,12 +6,13 @@ import type {
   Asset, Incident, OperationalTask, Alert, OpsEvent, Geofence, RouteEntity, User, TelemetrySample,
 } from '@fusion/shared-types';
 
-let token: string | null = localStorage.getItem('fusion.token');
+localStorage.removeItem('fusion.token'); // retire legacy persistent tokens
+let token: string | null = sessionStorage.getItem('fusion.token');
 
 export function setToken(t: string | null) {
   token = t;
-  if (t) localStorage.setItem('fusion.token', t);
-  else localStorage.removeItem('fusion.token');
+  if (t) sessionStorage.setItem('fusion.token', t);
+  else sessionStorage.removeItem('fusion.token');
 }
 export function getToken() { return token; }
 
@@ -25,6 +26,7 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
     },
   });
   if (!res.ok) {
+    if (res.status === 401) window.dispatchEvent(new Event('fusion:session-expired'));
     const detail = await res.json().catch(() => ({}));
     throw new Error((detail as { error?: string }).error ?? `HTTP ${res.status}`);
   }
@@ -32,6 +34,7 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  insights: () => req<import('@fusion/shared-types').OperationalBrief>('/api/insights'),
   login: (username: string, password: string) =>
     req<{ token: string; user: User; expiresAt: number }>('/api/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
   me: () => req<User>('/api/auth/me'),
