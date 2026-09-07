@@ -17,14 +17,14 @@ over WebSockets from a device-agnostic adapter layer (Skynode/PX4, MAVLink, TAK)
 
 ## Quick start (MVP — no database or hardware required)
 
-Requirements: **Node 20+**.
+Requirements: **Node 20.12+**.
 
 ```bash
 npm install          # installs all workspaces
 npm run dev          # starts the API (:4000) and the web app (:5173) together
 ```
 
-Then open **http://localhost:5173** and sign in with any password as one of:
+Then open **http://localhost:5173** and sign in with password **`demo`** (or `DEMO_PASSWORD`) as one of:
 `supervisor`, `operator`, `analyst`, `admin`.
 
 You will see (per §30):
@@ -51,8 +51,9 @@ Copy `.env.example` to `.env` to configure ports, map style, etc.
 
 ## Optional local infrastructure (Phase 1+)
 
-The MVP runs entirely in-memory. For persistence, identity, object storage and a
-real message bus:
+Without `DATA_DIR`, the runtime uses memory. With `DATA_DIR`, it saves single-process
+checkpoints and raw/audit archives. The following containers provide optional
+infrastructure; starting them does not connect the database, media, or NATS drivers:
 
 ```bash
 npm run infra:up     # Postgres/PostGIS, TimescaleDB, Keycloak, NATS, MinIO
@@ -100,6 +101,17 @@ Edge devices / UAVs → Adapter layer → Operations backend → WebSocket → W
 The core is written against **one normalized telemetry model** and never against
 a specific autopilot or vendor. New hardware = a new adapter, not a core change.
 Full detail in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+
+## Reliability upgrade (September 2026)
+
+The current increment adds protected WebSockets, OIDC + PKCE, strict mutation
+validation, file checkpoints, source-time ordering, alert recovery, optimistic
+feature updates, and an evidence-linked operations brief.
+
+- [Current guarantees and release blockers](docs/RELEASE_READINESS.md)
+- [Consolidated product specification and completion plan (Arabic)](docs/PLATFORM_FINAL_SPEC_AR.md)
+
+This is a tested foundation increment, **not a completed production platform**.
 
 ## Build phases
 

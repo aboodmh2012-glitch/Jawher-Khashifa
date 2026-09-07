@@ -38,7 +38,7 @@ export type AssetPositionMsg = Envelope<'asset.position', {
   assetId: string; lat: number; lon: number; altitude?: number; heading?: number; groundSpeed?: number;
 }>;
 export type AssetTelemetryMsg = Envelope<'asset.telemetry', NormalizedTelemetry>;
-export type AssetHealthMsg = Envelope<'asset.health', { assetId: string; health: Asset['health'] }>;
+export type AssetHealthMsg = Envelope<'asset.health', { assetId: string; health: Asset['health']; link?: Asset['link'] }>;
 export type AssetConnectedMsg = Envelope<'asset.connected', { asset: Asset }>;
 export type AssetDisconnectedMsg = Envelope<'asset.disconnected', { assetId: string }>;
 export type IncidentCreatedMsg = Envelope<'incident.created', Incident>;
@@ -56,7 +56,7 @@ export type EventMsg = Envelope<'event', OpsEvent>;
 export interface SnapshotMsg {
   topic: 'snapshot';
   ts: number;
-  payload: { assets: Asset[]; alerts: Alert[]; incidents: Incident[]; events: OpsEvent[]; features: Feature[] };
+  payload: { assets: Asset[]; alerts: Alert[]; incidents: Incident[]; tasks: OperationalTask[]; events: OpsEvent[]; features: Feature[] };
 }
 
 export type ServerMessage =

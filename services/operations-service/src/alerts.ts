@@ -26,7 +26,11 @@ export class AlertEngine {
   /** active[`${assetId}:${kind}`] = alertId, so we clear the right one. */
   private active = new Map<string, string>();
 
-  constructor(private store: Store, private bus: Bus) {}
+  constructor(private store: Store, private bus: Bus) {
+    for (const alert of store.alerts.values()) if (alert.status !== 'resolved') {
+      this.active.set(`${alert.source}:${alert.kind}`, alert.id);
+    }
+  }
 
   private rules(geofences: Geofence[]): Rule[] {
     return [
@@ -57,10 +61,10 @@ export class AlertEngine {
           if (!a.position) return miss();
           for (const f of geofences) {
             if (f.kind !== 'no-fly') continue;
-            for (const ring of f.polygon) {
-              if (pointInPolygon(a.position.lon, a.position.lat, ring)) {
-                return { hit: true, severity: 'high', message: `Entered no-fly zone "${f.name}"` };
-              }
+            const [outer, ...holes] = f.polygon;
+            if (outer && pointInPolygon(a.position.lon, a.position.lat, outer) &&
+                !holes.some(ring => pointInPolygon(a.position!.lon, a.position!.lat, ring))) {
+              return { hit: true, severity: 'high', message: `Entered no-fly zone "${f.name}"` };
             }
           }
           return miss();
@@ -81,6 +85,14 @@ export class AlertEngine {
         this.active.set(key, alert.id);
         this.bus.publish(envelope('alert.created', alert));
         this.emitEvent(alert);
+      } else if (hit && activeId) {
+        const alert = this.store.alerts.get(activeId);
+        if (alert && (alert.severity !== severity || alert.message !== message)) {
+          const escalated = ({ info: 0, warning: 1, high: 2, critical: 3 })[severity] > ({ info: 0, warning: 1, high: 2, critical: 3 })[alert.severity];
+          alert.severity = severity; alert.message = message;
+          if (escalated) { alert.status = 'open'; delete alert.acknowledgedAt; delete alert.acknowledgedBy; }
+          this.bus.publish(envelope('alert.created', alert));
+        }
       } else if (!hit && activeId) {
         const cleared = this.store.ackAlert(activeId, 'system', 'condition cleared');
         this.active.delete(key);

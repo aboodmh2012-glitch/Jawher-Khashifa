@@ -1,56 +1,48 @@
-# Deployment
+# Development and pilot deployment
 
-## Local development
+Requires Node 20.12+ (Node 22 recommended for the validation environment).
 
 ```bash
-npm install
-npm run dev          # API :4000 + web :5173 (in-memory, simulators on)
+npm ci
+cp .env.example .env
+npm run dev
 ```
 
-No database is required for the MVP. Copy `.env.example` → `.env` to change ports,
-map style, simulator count, etc.
-
-## Local infrastructure (Phase 1+)
+API: http://localhost:4000. Web: http://localhost:5173.
+Demo accounts: supervisor, operator, analyst, admin. Default password: demo.
+The root .env is loaded by the API and Vite; existing process environment takes
+precedence. DATA_DIR is resolved relative to the API working directory. Prefer
+an absolute DATA_DIR for deployed services. Without it all state is volatile.
 
 ```bash
-npm run infra:up     # docker compose: Postgres/PostGIS, TimescaleDB, Keycloak, NATS, MinIO
+npm run typecheck
+npm test
+npm run build
+npm run start -w @fusion/operations-service
+```
+
+For a restricted single-node pilot, set AUTH_MODE=oidc, SIM_ENABLED=false,
+ORGANIZATION_ID, OIDC_ISSUER, OIDC_AUDIENCE=fusion-api, OIDC_JWKS_URL and a dedicated
+absolute DATA_DIR. Set VITE_OIDC_ISSUER and VITE_OIDC_CLIENT_ID=fusion-web and rebuild.
+Provision the IdP account with administrator-managed orgId/role claims. The browser
+uses PKCE and returns to its origin root path; subpath hosting is not supported by
+the current callback configuration. Deployment-specific public origins and exact
+callback URLs must match the Keycloak client. No OIDC client secret goes in Vite.
+
+With NODE_ENV=production the service requires HTTPS identity/origin URLs and rejects
+demo auth/simulators. Put API and web behind HTTPS/WSS ingress. Configure API_HOST
+explicitly if a container must bind beyond loopback. Use one backend writer per
+DATA_DIR; file persistence does not support replicas. Review all limitations and
+release gates in [RELEASE_READINESS.md](RELEASE_READINESS.md).
+
+Optional development infrastructure:
+
+```bash
+npm run infra:up
 npm run infra:down
 ```
 
-| Service | Port | Default creds (dev only) |
-|---|---|---|
-| PostgreSQL/PostGIS | 5432 | fusion / fusion |
-| TimescaleDB | 5433 | fusion / fusion |
-| Keycloak | 8080 | admin / admin (realm `fusion`) |
-| NATS | 4222 / 8222 | — |
-| MinIO | 9000 / 9001 | fusion / fusion-change-me |
-
-The Postgres container runs `infrastructure/database/init.sql` on first boot.
-Create TimescaleDB hypertables for `telemetry` and `positions` (Phase 2):
-
-```sql
-SELECT create_hypertable('telemetry', 'ts');
-SELECT create_hypertable('positions', 'ts');
-```
-
-## Production notes
-
-- Put the API behind a gateway/ingress that terminates TLS and validates the
-  Keycloak JWT; set `CORS_ORIGIN` to the real web origin.
-- Point the frontend at the deployed API via `VITE_API_URL` / `VITE_WS_URL`, and
-  self-host map tiles (`VITE_MAP_STYLE`) for offline/air-gapped operation
-  (`infrastructure` + `mbtiles`-style tile server).
-- Swap `BUS_DRIVER=memory` for `nats` (or `mqtt`) to run services as separate
-  deployables (Phase 7).
-- Rotate every secret in `.env.example` before going live.
-
-## Build
-
-```bash
-npm run typecheck    # backend + frontend
-npm run build        # web-command-center production bundle (apps/web-command-center/dist)
-npm test --workspace @fusion/operations-service
-```
-
-Serve `apps/web-command-center/dist` from any static host/CDN; run the backend
-with `npm run start --workspace @fusion/operations-service` (or containerize it).
+The compose file starts PostgreSQL/PostGIS, TimescaleDB, Keycloak, NATS and MinIO.
+Only the OIDC connection is implemented in this increment. Starting a container or
+setting DATABASE_URL/NATS_URL does not implement a driver. BUS_DRIVER must remain
+memory; other values fail explicitly. Never deploy compose default credentials.

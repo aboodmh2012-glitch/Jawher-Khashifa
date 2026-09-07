@@ -21,6 +21,8 @@ export interface GeoPoint {
 }
 
 export interface NormalizedTelemetry {
+  /** Source journal correlation for auditing derived data. */
+  correlationId?: string;
   deviceId: string;
   assetId: string;
   /** epoch milliseconds (UTC). */

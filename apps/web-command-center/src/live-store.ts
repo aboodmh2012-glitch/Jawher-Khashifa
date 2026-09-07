@@ -28,6 +28,9 @@ class LiveStore {
   private listeners = new Set<() => void>();
   private ws: WebSocket | null = null;
   private notifyScheduled = false;
+  private stopped = true;
+  private retry: ReturnType<typeof setTimeout> | undefined;
+  private retries = 0;
 
   subscribe = (fn: () => void): (() => void) => {
     this.listeners.add(fn);
@@ -56,17 +59,35 @@ class LiveStore {
   select(id: string | null) { this.selectedId = id; this.notifyNow(); }
 
   connect() {
-    if (this.ws) return;
-    const url = `${config.wsUrl}?token=${encodeURIComponent(getToken() ?? '')}`;
-    const ws = new WebSocket(url);
+    this.stopped = false;
+    if (this.ws || !getToken()) return;
+    const ws = new WebSocket(config.wsUrl);
     this.ws = ws;
-    ws.onopen = () => { this.connected = true; this.notifyNow(); };
-    ws.onclose = () => {
+    ws.onopen = () => ws.send(JSON.stringify({ type: 'auth', token: getToken() }));
+    ws.onclose = event => {
+      if (this.ws !== ws) return;
       this.connected = false; this.ws = null; this.notifyNow();
-      setTimeout(() => this.connect(), 1500);
+      if (event.code === 1008) { this.disconnect(); window.dispatchEvent(new Event('fusion:session-expired')); return; }
+      if (!this.stopped) this.retry = setTimeout(() => this.connect(), Math.min(30000, 1000 * 2 ** Math.min(this.retries++, 5)) + Math.random() * 500);
     };
     ws.onerror = () => ws.close();
-    ws.onmessage = (e) => this.apply(JSON.parse(e.data) as ServerMessage | { topic: 'snapshot'; payload: SnapshotPayload });
+    ws.onmessage = e => {
+      if (this.ws !== ws || this.stopped) return;
+      try {
+        const message = JSON.parse(e.data) as ServerMessage;
+        if (message.topic === 'snapshot') { this.connected = true; this.retries = 0; }
+        this.apply(message);
+      } catch { ws.close(1002, 'Invalid server message'); }
+    };
+  }
+
+  disconnect() {
+    this.stopped = true; clearTimeout(this.retry);
+    const ws = this.ws; this.ws = null; ws?.close();
+    this.connected = false; this.retries = 0;
+    this.assets.clear(); this.alerts.clear(); this.incidents.clear(); this.tasks.clear(); this.features.clear();
+    this.trails.clear(); this.telem.clear(); this.events = []; this.geofences = []; this.routes = []; this.selectedId = null;
+    this.notifyNow();
   }
 
   private pushTrail(id: string, lon: number, lat: number) {
@@ -84,6 +105,8 @@ class LiveStore {
         this.alerts = new Map(p.alerts.filter((a) => a.status !== 'resolved').map((a) => [a.id, a]));
         this.incidents = new Map(p.incidents.map((i) => [i.id, i]));
         this.features = new Map((p.features ?? []).map((f) => [f.id, f]));
+        this.tasks = new Map(p.tasks.map(t => [t.id, t]));
+        this.trails.clear(); this.telem.clear();
         this.events = p.events;
         for (const a of p.assets) if (a.position) this.pushTrail(a.id, a.position.lon, a.position.lat);
         this.notifyNow();
@@ -118,7 +141,7 @@ class LiveStore {
         const a = this.assets.get(msg.payload.assetId); if (a) a.link = 'offline'; this.notify(); break;
       }
       case 'asset.health': {
-        const a = this.assets.get(msg.payload.assetId); if (a) a.health = msg.payload.health; this.notify(); break;
+        const a = this.assets.get(msg.payload.assetId); if (a) { a.health = msg.payload.health; if (msg.payload.link) a.link = msg.payload.link; } this.notify(); break;
       }
       case 'alert.created': { this.alerts.set(msg.payload.id, msg.payload); this.notifyNow(); break; }
       case 'alert.acknowledged': {
@@ -139,6 +162,6 @@ class LiveStore {
   }
 }
 
-interface SnapshotPayload { assets: Asset[]; alerts: Alert[]; incidents: Incident[]; events: OpsEvent[]; features: Feature[]; }
+interface SnapshotPayload { assets: Asset[]; alerts: Alert[]; incidents: Incident[]; tasks: OperationalTask[]; events: OpsEvent[]; features: Feature[]; }
 
 export const live = new LiveStore();
