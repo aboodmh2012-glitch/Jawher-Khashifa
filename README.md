@@ -13,6 +13,11 @@ picture with live assets, incidents, geofences and routes; a context panel with
 live telemetry; an alert engine; and an event timeline — all fed in real time
 over WebSockets from a device-agnostic adapter layer (Skynode/PX4, MAVLink, TAK).
 
+The project is evolving from a single Command Center into a broader operations
+**platform**. The existing core remains intact while new platform contracts,
+provider/app SDKs, and an offline-capable Edge Runtime are added incrementally.
+See [`docs/PLATFORM.md`](docs/PLATFORM.md).
+
 ---
 
 ## Quick start (MVP — no database or hardware required)
@@ -66,8 +71,9 @@ See [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
 ## Repository layout
 
 ```
-apps/web-command-center     React + TypeScript + Vite + MapLibre GL — the UI
+apps/web-command-center     React + TypeScript + Vite + MapLibre GL — first platform app
 services/operations-service TypeScript backend: REST + WebSocket + simulators
+services/edge-runtime       offline edge journal + store-and-forward sync boundary
 adapters/
   generic   @fusion/adapter-sdk   adapter contract + generic fleet simulator
   skynode   Auterion Skynode X / PX4 normalizer + UAV simulator
@@ -75,31 +81,64 @@ adapters/
   tak       internal objects ↔ Cursor-on-Target (CoT)
   video     RTSP / WebRTC / HLS stream descriptors
 packages/
-  shared-types      domain model + normalized telemetry
-  event-contracts   realtime event envelopes (bus + WebSocket)
-infrastructure/     docker-compose, database schema, keycloak realm
-docs/               ARCHITECTURE, API, ADAPTERS, DATA_MODEL, SECURITY, DEPLOYMENT
+  shared-types        domain model + normalized telemetry
+  event-contracts     realtime event envelopes (bus + WebSocket)
+  platform-contracts  operation/provider/app/edge platform boundaries
+  provider-sdk        provider registry + capability discovery
+  plugin-sdk          application registry + activation lifecycle
+infrastructure/       docker-compose, database schema, keycloak realm
+docs/                 architecture, API, adapters, data model, security, deployment, platform
 ```
 
 ## Architecture at a glance
 
-```
-Edge devices / UAVs → Adapter layer → Operations backend → WebSocket → Web command center
-   (Skynode/PX4,        (normalize to     (store, alert       (live      (MapLibre COP,
-    MAVLink, TAK,        one telemetry      engine, events)     GeoJSON)   panels, timeline)
-    sensors, video)      model)
+```text
+Edge devices / remote sites
+        ↓
+Edge Runtime → Adapters / Providers → RawEvent → Validation / Normalization
+                                                ↓
+                                  Event Bus → Domain Services
+                                                ↓
+                             Observations / Fusion / Tracks
+                                                ↓
+                              Operational Picture + History
+                                                ↓
+                                 Realtime / Sync → Apps
+                                                ↓
+                                      Web Command Center
 ```
 
 The core is written against **one normalized telemetry model** and never against
-a specific autopilot or vendor. New hardware = a new adapter, not a core change.
-Full detail in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+a specific autopilot or vendor. New hardware = a new adapter. Broader integrations
+are exposed as capability-declaring providers rather than vendor-specific core
+logic.
+
+## Platform baseline
+
+The current baseline now includes:
+
+- RawEvent-first provenance and runtime validation
+- versioned realtime event envelopes and correlation/causation IDs
+- repository boundaries for persistence
+- observations, fusion, tracks and confidence/data-quality state
+- organization / operation aware platform contracts
+- Provider SDK with capability registry and health lifecycle
+- App / Plugin SDK with capability checks and activation lifecycle
+- Edge Runtime foundation with journal-first ingestion, cursors and store-and-forward
+- narrow optional AI capability contracts for incident, alert, timeline and data-quality assistance
+
+The next delivery sequence is state/history separation, authoritative organization
+and operation scoping, durable edge storage, offline synchronization, provider/app
+hardening, media/replay, narrow local AI, audit/security hardening and production HA.
+See [`docs/PLATFORM.md`](docs/PLATFORM.md) for the authoritative platform roadmap.
 
 ## Build phases
 
 MVP delivered: Phases 1–4 core (assets, simulators, telemetry, WebSockets, map,
-panels, incidents, tasks, alerts, timeline). Remaining: video/replay (5),
-TAK/Open MCT/Matrix (6), offline sync / plugin SDK / multi-org hardening (7).
-See the phase table in `docs/ARCHITECTURE.md`.
+panels, incidents, tasks, alerts, timeline). Video/replay remains incomplete.
+TAK integration seams exist. Platform/edge/provider/plugin foundations are now
+present, while durable offline sync, multi-org hardening and production deployment
+remain follow-on work.
 
 ## License
 
