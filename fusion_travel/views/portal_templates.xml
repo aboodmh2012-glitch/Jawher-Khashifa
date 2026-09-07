@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <template id="portal_my_home_menu_travel" inherit_id="portal.portal_my_home" priority="35">
+    <xpath expr="//div[hasclass('o_portal_docs')]" position="inside">
+      <t t-call="portal.portal_docs_entry">
+        <t t-set="title">Travel Bookings</t>
+        <t t-set="url" t-value="'/my/travel/bookings'"/>
+        <t t-set="placeholder_count" t-value="'fusion_travel_booking_count'"/>
+      </t>
+    </xpath>
+  </template>
+
+  <template id="portal_my_trip_bookings" name="My Travel Bookings">
+    <t t-call="portal.portal_layout">
+      <t t-set="breadcrumbs_searchbar" t-value="True"/>
+      <t t-call="portal.portal_searchbar">
+        <t t-set="title">Travel Bookings</t>
+      </t>
+      <div class="table-responsive">
+        <table class="table table-hover align-middle">
+          <thead>
+            <tr><th>Booking</th><th>Service</th><th>Status</th><th>Payment</th><th>Total</th></tr>
+          </thead>
+          <tbody>
+            <t t-foreach="bookings" t-as="booking">
+              <tr>
+                <td><a t-att-href="'/my/travel/booking/%s' % booking.id" t-out="booking.name"/></td>
+                <td class="text-capitalize" t-out="booking.booking_type"/>
+                <td class="text-capitalize" t-out="booking.state.replace('_', ' ')"/>
+                <td class="text-capitalize" t-out="booking.payment_status"/>
+                <td><t t-out="booking.total_amount"/> <t t-out="booking.currency_id.name"/></td>
+              </tr>
+            </t>
+            <tr t-if="not bookings">
+              <td colspan="5" class="text-center text-muted py-4">No travel bookings are available.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </t>
+  </template>
+
+  <template id="portal_my_trip_booking_detail" name="Travel Booking Detail">
+    <t t-call="portal.portal_layout">
+      <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+        <div>
+          <h2 class="mb-1" t-out="booking.name"/>
+          <div class="text-muted text-capitalize">
+            <t t-out="booking.booking_type"/> · <t t-out="booking.state.replace('_', ' ')"/>
+          </div>
+        </div>
+        <div class="d-flex gap-2">
+          <a class="btn btn-outline-primary" href="/travel">New Search</a>
+          <a t-if="booking.invoice_id" class="btn btn-primary" t-att-href="'/my/invoices/%s' % booking.invoice_id.id">View Invoice</a>
+        </div>
+      </div>
+
+      <div class="row g-4">
+        <div class="col-lg-8">
+          <div class="card mb-4">
+            <div class="card-header"><strong>Booking Summary</strong></div>
+            <div class="card-body row g-3">
+              <div class="col-md-6"><span class="text-muted d-block">PNR</span><strong t-out="booking.pnr or '-'"/></div>
+              <div class="col-md-6"><span class="text-muted d-block">Provider Reference</span><strong t-out="booking.amadeus_reference or '-'"/></div>
+              <div class="col-md-6"><span class="text-muted d-block">Payment</span><strong class="text-capitalize" t-out="booking.payment_status"/></div>
+              <div class="col-md-6"><span class="text-muted d-block">Provider Order</span><strong class="text-capitalize" t-out="booking.provider_order_status.replace('_', ' ')"/></div>
+              <div class="col-md-6"><span class="text-muted d-block">Total</span><strong><t t-out="booking.total_amount"/> <t t-out="booking.currency_id.name"/></strong></div>
+            </div>
+          </div>
+
+          <div class="card mb-4" t-if="booking.passenger_ids">
+            <div class="card-header"><strong>Travelers</strong></div>
+            <div class="table-responsive">
+              <table class="table mb-0">
+                <thead><tr><th>Name</th><th>Type</th><th>Ticket Number</th></tr></thead>
+                <tbody>
+                  <tr t-foreach="booking.passenger_ids" t-as="passenger">
+                    <td><t t-out="passenger.first_name"/> <t t-out="passenger.last_name"/></td>
+                    <td class="text-capitalize" t-out="passenger.passenger_type"/>
+                    <td t-out="passenger.ticket_number or '-'"/>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card mb-4" t-if="booking.flight_segment_ids">
+            <div class="card-header"><strong>Flight Itinerary</strong></div>
+            <div class="table-responsive">
+              <table class="table mb-0">
+                <thead><tr><th>Flight</th><th>From</th><th>To</th><th>Departure</th><th>Arrival</th></tr></thead>
+                <tbody>
+                  <tr t-foreach="booking.flight_segment_ids" t-as="segment">
+                    <td t-out="segment.flight_number or segment.airline_code or '-'"/>
+                    <td t-out="segment.origin_airport or '-'"/>
+                    <td t-out="segment.destination_airport or '-'"/>
+                    <td t-out="segment.departure_time or '-'"/>
+                    <td t-out="segment.arrival_time or '-'"/>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card mb-4" t-if="booking.hotel_stay_ids">
+            <div class="card-header"><strong>Hotel</strong></div>
+            <div class="card-body" t-foreach="booking.hotel_stay_ids" t-as="stay">
+              <h5 t-out="stay.hotel_name"/>
+              <p class="mb-1"><t t-out="stay.checkin_date"/> → <t t-out="stay.checkout_date"/></p>
+              <p class="mb-0 text-muted" t-out="stay.room_type or stay.city or ''"/>
+            </div>
+          </div>
+
+          <div class="card mb-4" t-if="booking.car_rental_ids">
+            <div class="card-header"><strong>Vehicle / Airport Transfer</strong></div>
+            <div class="card-body" t-foreach="booking.car_rental_ids" t-as="service">
+              <h5 t-out="service.vehicle_type or service.provider or 'Vehicle service'"/>
+              <p class="mb-1"><t t-out="service.pickup_location"/> → <t t-out="service.dropoff_location"/></p>
+              <p class="mb-0 text-muted" t-out="service.pickup_datetime or ''"/>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-lg-4">
+          <div class="card mb-4" t-if="booking.flight_ticket_ids">
+            <div class="card-header"><strong>Issued Tickets</strong></div>
+            <ul class="list-group list-group-flush">
+              <li class="list-group-item" t-foreach="booking.flight_ticket_ids" t-as="ticket">
+                <div class="fw-semibold" t-out="ticket.ticket_number"/>
+                <small class="text-muted"><t t-out="ticket.traveler_name"/> · <t t-out="ticket.airline_number or ''"/></small>
+              </li>
+            </ul>
+          </div>
+          <div class="card">
+            <div class="card-header"><strong>Need help?</strong></div>
+            <div class="card-body">
+              <p class="mb-0">Contact Fusion Travel support and provide booking number <strong t-out="booking.name"/>.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </t>
+  </template>
+</odoo>

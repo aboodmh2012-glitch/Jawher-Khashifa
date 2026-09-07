@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <menuitem id="menu_fusion_travel_root" name="Travel" sequence="35" web_icon="fusion_travel,static/description/icon.png" groups="fusion_travel.group_fusion_travel_user"/>
+
+  <menuitem id="menu_fusion_travel_operations" name="Operations" parent="menu_fusion_travel_root" sequence="10"/>
+  <menuitem id="menu_fusion_travel_bookings" name="Bookings" parent="menu_fusion_travel_operations" action="trip_booking_action" sequence="10"/>
+  <menuitem id="menu_fusion_travel_flight_tickets" name="Flight Tickets" parent="menu_fusion_travel_operations" action="action_fusion_travel_flight_ticket" sequence="20"/>
+  <menuitem id="menu_fusion_travel_wallet" name="Wallet Transactions" parent="menu_fusion_travel_operations" action="trip_wallet_transaction_action" sequence="30" groups="fusion_travel.group_fusion_travel_accountant"/>
+
+  <menuitem id="menu_fusion_travel_configuration" name="Configuration" parent="menu_fusion_travel_root" sequence="90" groups="fusion_travel.group_fusion_travel_manager"/>
+  <menuitem id="menu_fusion_travel_configuration_settings" name="Settings" parent="menu_fusion_travel_configuration" action="action_fusion_travel_res_config_settings" sequence="5"/>
+  <menuitem id="menu_fusion_travel_airline" name="Airlines" parent="menu_fusion_travel_configuration" action="action_fusion_travel_airline" sequence="10"/>
+  <menuitem id="menu_fusion_travel_pricing" name="Pricing Rules" parent="menu_fusion_travel_configuration" action="trip_pricing_rule_action" sequence="20"/>
+  <menuitem id="menu_fusion_travel_api_logs" name="API Logs" parent="menu_fusion_travel_configuration" action="trip_api_log_action" sequence="30"/>
+  <menuitem id="menu_fusion_travel_search_sessions" name="Search Sessions" parent="menu_fusion_travel_configuration" action="action_fusion_travel_search_sessions" sequence="40"/>
+</odoo>

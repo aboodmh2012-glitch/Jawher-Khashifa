@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <record id="product_fusion_travel_flight" model="product.product">
+        <field name="name">Flight Booking</field>
+        <field name="type">service</field>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="True"/>
+    </record>
+    <record id="product_fusion_travel_hotel" model="product.product">
+        <field name="name">Hotel Booking</field>
+        <field name="type">service</field>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="True"/>
+    </record>
+    <record id="product_fusion_travel_car" model="product.product">
+        <field name="name">Car / Transfer Booking</field>
+        <field name="type">service</field>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="True"/>
+    </record>
+</odoo>

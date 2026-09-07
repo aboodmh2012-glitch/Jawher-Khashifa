@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <record id="action_fusion_travel_search_sessions" model="ir.actions.act_window"><field name="name">Search Sessions</field><field name="res_model">fusion.travel.search.session</field><field name="view_mode">list,form</field></record>
+  <record id="view_fusion_travel_search_session_list" model="ir.ui.view"><field name="name">fusion.travel.search.session.list</field><field name="model">fusion.travel.search.session</field><field name="arch" type="xml"><list create="0" edit="0"><field name="token"/><field name="service_type"/><field name="partner_id"/><field name="expires_at"/><field name="company_id" groups="base.group_multi_company"/></list></field></record>
+</odoo>

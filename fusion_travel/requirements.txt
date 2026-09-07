@@ -1,0 +1,1 @@
+# No extra Python package is required. Odoo already provides requests.
