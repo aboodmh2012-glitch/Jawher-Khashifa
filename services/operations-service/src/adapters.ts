@@ -13,11 +13,18 @@ import type { Store } from './store.js';
 import type { Bus } from './bus.js';
 import type { AlertEngine } from './alerts.js';
 import type { FusionService } from './fusion.js';
+import type { IntelligenceCore } from './intelligence-core.js';
 import { ObservationPipeline } from './observation-pipeline.js';
 import { config } from './config.js';
 
-export function buildContext(store: Store, bus: Bus, alerts: AlertEngine, fusion: FusionService): AdapterContext {
-  const observations = new ObservationPipeline(store, fusion);
+export function buildContext(
+  store: Store,
+  bus: Bus,
+  alerts: AlertEngine,
+  fusion: FusionService,
+  intelligence: IntelligenceCore,
+): AdapterContext {
+  const observations = new ObservationPipeline(store, fusion, intelligence);
 
   return {
     onRaw(protocol, messageType, payload, ref) {
@@ -32,7 +39,6 @@ export function buildContext(store: Store, bus: Bus, alerts: AlertEngine, fusion
     },
     onTelemetry(t, provenance) {
       if (provenance) t.provenance = provenance;
-      // Runtime validation at the domain boundary. Invalid → quarantine, never crash.
       const res = validate('telemetry.v1', t);
       if (!res.valid) {
         metrics.counter('validation_failures_total', 'payloads that failed schema validation').inc(1, { source: provenance?.sourceProtocol ?? 'unknown' });
@@ -66,8 +72,6 @@ export function buildContext(store: Store, bus: Bus, alerts: AlertEngine, fusion
       bus.publish(envelope('asset.telemetry', t, meta));
       alerts.evaluate(asset);
 
-      // Derive an immutable evidence-linked Observation through the shared
-      // pipeline, then let FusionService maintain the recognized track picture.
       observations.ingestTelemetry(t, asset.orgId, provenance);
     },
     onAssetUp(seed) {
@@ -76,7 +80,7 @@ export function buildContext(store: Store, bus: Bus, alerts: AlertEngine, fusion
     },
     onAssetDown(assetId) {
       const asset = store.assets.get(assetId);
-      if (asset) { asset.link = 'offline'; }
+      if (asset) asset.link = 'offline';
       bus.publish(envelope('asset.disconnected', { assetId }, { organizationId: asset?.orgId, assetId }));
     },
     onEvent(topic, message, source) {
@@ -87,8 +91,14 @@ export function buildContext(store: Store, bus: Bus, alerts: AlertEngine, fusion
   };
 }
 
-export function startAdapters(store: Store, bus: Bus, alerts: AlertEngine, fusion: FusionService): () => void {
-  const ctx = buildContext(store, bus, alerts, fusion);
+export function startAdapters(
+  store: Store,
+  bus: Bus,
+  alerts: AlertEngine,
+  fusion: FusionService,
+  intelligence: IntelligenceCore,
+): () => void {
+  const ctx = buildContext(store, bus, alerts, fusion, intelligence);
   const adapters: Adapter[] = [];
 
   if (config.sim.enabled) {
