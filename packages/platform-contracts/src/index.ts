@@ -21,7 +21,8 @@ export interface OperationRef {
   id: string;
   organizationId: string;
   name: string;
-  status: 'planned' | 'active' | 'paused' | 'closed' | 'archived';
+  // Aligned with the authoritative domain Operation.status (shared-types).
+  status: 'draft' | 'active' | 'paused' | 'closed' | 'archived';
 }
 
 export interface FeatureRef {
