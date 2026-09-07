@@ -13,12 +13,14 @@ import { AlertEngine } from './alerts.js';
 import { registerRoutes } from './routes.js';
 import { registerReplayRoutes } from './replay-routes.js';
 import { registerIntelligenceRoutes } from './intelligence-routes.js';
+import { registerAIRoutes } from './ai-routes.js';
 import { registerRealtime } from './realtime.js';
 import { startAdapters } from './adapters.js';
 import { seedDemo } from './seed.js';
 import { createRepositories } from './repositories.js';
 import { FusionService } from './fusion.js';
 import { IntelligenceCore } from './intelligence-core.js';
+import { AIGateway } from './ai-gateway.js';
 import { metrics } from '@fusion/observability';
 
 export interface BuiltApp {
@@ -56,6 +58,7 @@ export async function buildApp(): Promise<BuiltApp> {
         bus: `ok (${busDriver})`,
         repositories: `ok (${repoDriver})`,
         intelligence: 'ok',
+        aiGateway: 'ok (read-only)',
         metrics: 'ok',
         mode: config.sim.enabled ? 'demo-memory' : 'live',
       },
@@ -71,12 +74,14 @@ export async function buildApp(): Promise<BuiltApp> {
   const alerts = new AlertEngine(store, bus);
   const fusion = new FusionService(store, bus);
   const intelligence = new IntelligenceCore(store);
+  const aiGateway = new AIGateway(store, intelligence);
   const repositories = createRepositories(store, repoDriver);
 
   seedDemo(store);
   registerRoutes(app, store, bus, repositories);
   registerReplayRoutes(app, store);
   registerIntelligenceRoutes(app, store, intelligence);
+  registerAIRoutes(app, aiGateway);
   registerRealtime(app, store, bus);
   const stopAdapters = startAdapters(store, bus, alerts, fusion, intelligence);
 
