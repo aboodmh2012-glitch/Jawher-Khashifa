@@ -3,21 +3,22 @@
 // the demo adapters (§26). Adding a real adapter later = instantiate it here (or
 // load from config) and call start(ctx) — nothing else changes.
 
-import { randomUUID } from 'node:crypto';
 import { envelope, newId, type EventMeta } from '@fusion/event-contracts';
 import { validate } from '@fusion/validation';
 import { metrics } from '@fusion/observability';
 import type { Adapter, AdapterContext } from '@fusion/adapter-sdk';
 import { SimFleetAdapter } from '@fusion/adapter-sdk';
 import { SkynodeSimAdapter } from '@fusion/adapter-skynode';
-import type { Observation } from '@fusion/shared-types';
 import type { Store } from './store.js';
 import type { Bus } from './bus.js';
 import type { AlertEngine } from './alerts.js';
 import type { FusionService } from './fusion.js';
+import { ObservationPipeline } from './observation-pipeline.js';
 import { config } from './config.js';
 
 export function buildContext(store: Store, bus: Bus, alerts: AlertEngine, fusion: FusionService): AdapterContext {
+  const observations = new ObservationPipeline(store, fusion);
+
   return {
     onRaw(protocol, messageType, payload, ref) {
       // RAW IS ALWAYS JOURNALED BEFORE ANY DERIVED DATA IS PUBLISHED.
@@ -65,29 +66,9 @@ export function buildContext(store: Store, bus: Bus, alerts: AlertEngine, fusion
       bus.publish(envelope('asset.telemetry', t, meta));
       alerts.evaluate(asset);
 
-      // Derive an immutable Observation and fold it into the track picture (Phase B).
-      const now = Date.now();
-      const confidence = t.linkQuality != null ? Math.max(0.3, Math.min(1, t.linkQuality / 100)) : 0.6;
-      const obs: Observation = {
-        id: randomUUID(),
-        organizationId: asset.orgId,
-        sourceId: provenance?.sourceProtocol ?? 'core',
-        sensorId: provenance?.sourceMessageType,
-        assetId: asset.id,
-        occurredAt: t.timestamp,
-        receivedAt: now,
-        position: t.position,
-        velocity: (t.groundSpeed != null || t.heading != null) ? { speed: t.groundSpeed ?? 0, heading: t.heading } : undefined,
-        heading: t.heading,
-        altitude: t.position.altitude,
-        confidence,
-        quality: { confidence, state: 'good', lastUpdated: now, sourceCount: 1 },
-        rawEventId: provenance?.rawEventId,
-        correlationId: provenance?.correlationId,
-      };
-      store.observations.push(obs);
-      if (store.observations.length > 2000) store.observations.shift();
-      fusion.ingest(obs);
+      // Derive an immutable evidence-linked Observation through the shared
+      // pipeline, then let FusionService maintain the recognized track picture.
+      observations.ingestTelemetry(t, asset.orgId, provenance);
     },
     onAssetUp(seed) {
       const asset = store.upsertAssetSeed(seed);
