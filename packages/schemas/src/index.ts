@@ -40,7 +40,7 @@ export const RawEventSchema = z.object({
   receivedAt: z.number().positive(),
   parserVersion: z.string().min(1),
   correlationId: z.string().min(1),
-  processingStatus: z.enum(['received', 'validated', 'normalized', 'quarantined', 'failed', 'reprocessed']).optional(),
+  processingStatus: z.enum(['received', 'validated', 'normalized', 'quarantined', 'failed', 'reprocessed']),
   organizationId: z.string().optional(),
   deviceId: z.string().optional(),
   assetId: z.string().optional(),

@@ -79,12 +79,12 @@ export class AlertEngine {
       if (hit && !activeId) {
         const alert = this.store.addAlert({ kind: rule.kind, severity, source: asset.id, sourceName: asset.name, message });
         this.active.set(key, alert.id);
-        this.bus.publish(envelope('alert.created', alert));
+        this.bus.publish(envelope('alert.created', alert, { organizationId: alert.orgId, assetId: alert.source }));
         this.emitEvent(alert);
       } else if (!hit && activeId) {
         const cleared = this.store.ackAlert(activeId, 'system', 'condition cleared');
         this.active.delete(key);
-        if (cleared) { cleared.status = 'resolved'; this.bus.publish(envelope('alert.acknowledged', cleared)); }
+        if (cleared) { cleared.status = 'resolved'; this.bus.publish(envelope('alert.acknowledged', cleared, { organizationId: cleared.orgId, assetId: cleared.source })); }
       }
     }
   }
@@ -101,12 +101,12 @@ export class AlertEngine {
       const id = this.active.get(key)!;
       const cleared = this.store.ackAlert(id, 'system', 'link restored');
       this.active.delete(key);
-      if (cleared) { cleared.status = 'resolved'; this.bus.publish(envelope('alert.acknowledged', cleared)); }
+      if (cleared) { cleared.status = 'resolved'; this.bus.publish(envelope('alert.acknowledged', cleared, { organizationId: cleared.orgId, assetId: cleared.source })); }
     }
   }
 
   private emitEvent(alert: Alert): void {
     const ev = this.store.addEvent('alert.created', alert.message, alert.source, alert.severity);
-    this.bus.publish(envelope('event', ev));
+    this.bus.publish(envelope('event', ev, { organizationId: ev.orgId, source: ev.source }));
   }
 }

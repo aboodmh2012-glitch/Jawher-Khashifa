@@ -228,6 +228,11 @@ export class Store {
 
   // ---- Asset ↔ Device relationship (over time) ----
   linkAssetDevice(assetId: string, deviceId: string, opts: { role?: string; isPrimary?: boolean } = {}): AssetDevice {
+    // Invariant (mirrors the DB unique index): a device is mounted on at most one
+    // asset at a time — end any existing active link before creating the new one.
+    for (const l of this.assetDevices) {
+      if (l.deviceId === deviceId && l.removedAt == null) l.removedAt = Date.now();
+    }
     const link: AssetDevice = {
       id: randomUUID(), assetId, deviceId, role: opts.role,
       isPrimary: opts.isPrimary ?? false, installedAt: Date.now(),

@@ -25,6 +25,17 @@ test('Asset↔Device: many devices, one primary, and a device can move assets', 
   assert.equal(store.devicesOfAsset('A2').length, 1);
 });
 
+test('Asset↔Device: linking a device to a new asset auto-ends its previous link (single active)', () => {
+  const store = new Store('org-demo');
+  withDevices(store, ['D1']);
+  store.linkAssetDevice('A1', 'D1', { isPrimary: true });
+  // re-link to A2 WITHOUT an explicit unlink — must move, not double-book
+  store.linkAssetDevice('A2', 'D1');
+  assert.equal(store.assetOfDevice('D1'), 'A2');
+  assert.equal(store.devicesOfAsset('A1').length, 0);
+  assert.equal(store.assetDevices.filter((l) => l.deviceId === 'D1' && l.removedAt == null).length, 1);
+});
+
 test('RawEvent starts received and advances status; payload untouched', () => {
   const store = new Store('org-demo');
   const raw = store.addRawEvent('SKYNODE', 'telemetry', { lat: 1, lon: 2 }, { assetId: 'A1' });

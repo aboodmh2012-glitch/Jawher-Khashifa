@@ -83,7 +83,7 @@ export async function buildApp(): Promise<BuiltApp> {
   const gAssets = metrics.gauge('asset_count', 'known assets');
   const sweep = setInterval(() => {
     for (const asset of store.refreshLinkStates()) {
-      bus.publish(envelope('asset.health', { assetId: asset.id, health: asset.health }));
+      bus.publish(envelope('asset.health', { assetId: asset.id, health: asset.health }, { organizationId: asset.orgId, assetId: asset.id }));
       alerts.commsLost(asset);
     }
     fusion.sweep();

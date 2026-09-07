@@ -86,7 +86,7 @@ export function registerRoutes(app: FastifyInstance, store: Store, bus: Bus, rep
     const a = can(req, reply, 'asset.read'); if (!a) return;
     const id = (req.params as { id: string }).id;
     const asset = store.assets.get(id);
-    if (scope(a) && asset && asset.orgId !== a.orgId) return reply.code(404).send({ error: 'not found' });
+    if (!asset || (scope(a) && asset.orgId !== a.orgId)) return reply.code(404).send({ error: 'not found' });
     return store.devicesOfAsset(id);
   });
   app.get('/api/agents', async (req, reply) => {

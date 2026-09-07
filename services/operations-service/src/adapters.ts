@@ -44,7 +44,7 @@ export function buildContext(store: Store, bus: Bus, alerts: AlertEngine, fusion
         const ev = store.addEvent('telemetry.quarantined',
           `Quarantined telemetry from ${provenance?.sourceProtocol ?? 'unknown'}: ${res.errors[0]?.message ?? 'invalid'}`,
           t.assetId, 'warning');
-        bus.publish(envelope('event', ev));
+        bus.publish(envelope('event', ev, { organizationId: ev.orgId, source: ev.source }));
         return;
       }
       if (provenance?.rawEventId) store.setRawEventStatus(provenance.rawEventId, 'validated');
@@ -91,12 +91,12 @@ export function buildContext(store: Store, bus: Bus, alerts: AlertEngine, fusion
     },
     onAssetUp(seed) {
       const asset = store.upsertAssetSeed(seed);
-      bus.publish(envelope('asset.connected', { asset }));
+      bus.publish(envelope('asset.connected', { asset }, { organizationId: asset.orgId, assetId: asset.id }));
     },
     onAssetDown(assetId) {
       const asset = store.assets.get(assetId);
       if (asset) { asset.link = 'offline'; }
-      bus.publish(envelope('asset.disconnected', { assetId }));
+      bus.publish(envelope('asset.disconnected', { assetId }, { organizationId: asset?.orgId, assetId }));
     },
     onEvent(topic, message, source) {
       const ev = store.addEvent(topic, message, source);

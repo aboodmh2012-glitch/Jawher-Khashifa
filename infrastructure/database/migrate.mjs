@@ -23,9 +23,9 @@ async function main() {
   await client.query('CREATE TABLE IF NOT EXISTS schema_migrations (filename TEXT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT now())');
   const applied = new Set((await client.query('SELECT filename FROM schema_migrations')).rows.map((r) => r.filename));
 
-  const files = ['../init.sql', ...readdirSync(join(here, 'migrations')).filter((f) => f.endsWith('.sql')).sort().map((f) => `migrations/${f}`)];
+  const files = ['init.sql', ...readdirSync(join(here, 'migrations')).filter((f) => f.endsWith('.sql')).sort().map((f) => `migrations/${f}`)];
   for (const rel of files) {
-    const name = rel.replace('../', '').replace('migrations/', '');
+    const name = rel.replace('migrations/', '');
     if (applied.has(name)) { console.log(`skip  ${name}`); continue; }
     const sql = readFileSync(join(here, rel), 'utf8');
     process.stdout.write(`apply ${name} ... `);
