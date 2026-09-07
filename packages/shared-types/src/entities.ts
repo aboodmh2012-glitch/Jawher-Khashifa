@@ -167,11 +167,6 @@ export interface AuthSession {
 
 // ── Final-architecture additions ────────────────────────────────────────────
 
-/**
- * Raw, unparsed source message — kept verbatim beside the derived data so the
- * pipeline is replayable if a parser changes (RawEvent → normalize → domain).
- * Never deleted after parsing.
- */
 /** Lifecycle of a journaled raw event. Historical payloads are never mutated;
  *  only the processing status advances, enabling safe reprocessing. */
 export type RawEventStatus =
@@ -257,8 +252,7 @@ export interface Group {
 }
 
 /** An Observation — something reported by ONE source at ONE time. Immutable.
- *  Not an Asset, not a Track. The fusion service consumes these. (Phase B fills
- *  the producing pipeline; the type exists now so repositories can be typed.) */
+ *  Not an Asset, not a Track. The fusion service consumes these. */
 export interface Observation {
   id: string;
   organizationId: string;
@@ -284,7 +278,7 @@ export interface Observation {
 export type TrackState = 'tentative' | 'confirmed' | 'coasting' | 'lost' | 'archived';
 
 /** A Track — the platform's fused understanding of an observed entity, for
- *  situational awareness (NOT targeting). Phase B implements the fusion service. */
+ *  situational awareness (NOT targeting). */
 export interface Track {
   id: string;
   organizationId: string;
@@ -300,7 +294,11 @@ export interface Track {
   quality: DataQuality;
   firstSeenAt: number;
   lastSeenAt: number;
+  /** Number of distinct contributing sources, not number of observations. */
   sourceCount: number;
+  /** Bounded provenance of distinct contributing sources. */
+  sourceIds?: string[];
+  /** Bounded recent observation provenance used for drill-down/replay. */
   observationIds: string[];
   metadata?: Record<string, unknown>;
 }
