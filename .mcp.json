@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "odoo": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "https://fusionlc.com/mcp",
+        "--header",
+        "Authorization: Bearer ${ODOO_MCP_TOKEN}"
+      ]
+    }
+  }
+}

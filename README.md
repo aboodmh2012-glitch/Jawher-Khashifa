@@ -78,8 +78,15 @@ packages/
   shared-types      domain model + normalized telemetry
   event-contracts   realtime event envelopes (bus + WebSocket)
 infrastructure/     docker-compose, database schema, keycloak realm
-docs/               ARCHITECTURE, API, ADAPTERS, DATA_MODEL, SECURITY, DEPLOYMENT
+docs/               ARCHITECTURE, API, ADAPTERS, DATA_MODEL, SECURITY, DEPLOYMENT, ODOO_MCP
 ```
+
+## Integrations
+
+An Odoo MCP server (`https://fusionlc.com/mcp`) is wired in via a project-scoped
+[`.mcp.json`](.mcp.json). The bearer token is supplied through the
+`ODOO_MCP_TOKEN` environment variable — never committed. See
+[`docs/ODOO_MCP.md`](docs/ODOO_MCP.md).
 
 ## Architecture at a glance
 
