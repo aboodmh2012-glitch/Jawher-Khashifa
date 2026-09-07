@@ -30,6 +30,7 @@ export interface Team {
   orgId: string;
   name: string;
   memberIds: string[];
+  unitId?: string;           // Team PART_OF Unit (permanent org hierarchy)
 }
 
 export interface Asset {
@@ -171,18 +172,33 @@ export interface AuthSession {
  * pipeline is replayable if a parser changes (RawEvent → normalize → domain).
  * Never deleted after parsing.
  */
+/** Lifecycle of a journaled raw event. Historical payloads are never mutated;
+ *  only the processing status advances, enabling safe reprocessing. */
+export type RawEventStatus =
+  | 'received' | 'validated' | 'normalized' | 'quarantined' | 'failed' | 'reprocessed';
+
 export interface RawEvent {
   id: string;
+  organizationId?: string;
+  operationId?: string;
   deviceId?: string;
   assetId?: string;
+  agentId?: string;
+  adapterId?: string;        // which adapter produced it
+  adapterVersion?: string;
   protocol: string;          // MAVLINK | COT | GPS | SIM | ...
   messageType: string;       // GLOBAL_POSITION_INT | event | ...
-  payload: unknown;          // original message (object or string)
+  payload: unknown;          // original message — IMMUTABLE
   payloadFormat: 'json' | 'xml' | 'text' | 'binary-base64';
   sourceTimestamp?: number;
   receivedAt: number;
   parserVersion: string;
+  schemaVersion?: number;
   correlationId: string;
+  deduplicationKey?: string;
+  checksum?: string;
+  processingStatus: RawEventStatus;
+  metadata?: Record<string, unknown>;
 }
 
 /** Top-level container for a piece of work. Assets/incidents/tasks/features hang off it. */

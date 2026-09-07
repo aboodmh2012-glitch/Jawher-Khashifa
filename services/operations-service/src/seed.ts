@@ -19,6 +19,32 @@ export function seedDemo(store: Store): void {
     store.users.set(username, { id: username, orgId, username, displayName, role });
   }
 
+  // permanent organizational hierarchy: Region → OperationsCenter → Unit → Team
+  store.regions.set('region-1', { id: 'region-1', organizationId: orgId, name: 'Central Region', createdAt: Date.now() });
+  store.operationsCenters.set('oc-1', { id: 'oc-1', organizationId: orgId, regionId: 'region-1', name: 'Ops Center Alpha', createdAt: Date.now() });
+  store.units.set('unit-1', { id: 'unit-1', organizationId: orgId, operationsCenterId: 'oc-1', name: 'Air Unit 1', createdAt: Date.now() });
+  store.teams.set('team-1', { id: 'team-1', orgId, name: 'Recon Team A', memberIds: ['operator'], unitId: 'unit-1' });
+  store.teamMemberships.push({ id: 'tm-1', teamId: 'team-1', userId: 'operator', role: 'lead', joinedAt: Date.now() });
+
+  // devices + Asset↔Device links (UAV-01 carries autopilot + camera + gps)
+  const devices: import('@fusion/shared-types').Device[] = [
+    { id: 'DEV-SKY-1', organizationId: orgId, manufacturer: 'Auterion', model: 'Skynode X', protocol: 'MAVLINK', adapter: 'skynode', status: 'online', capabilities: ['telemetry.read', 'navigation.read'] },
+    { id: 'DEV-CAM-1', organizationId: orgId, manufacturer: 'Generic', model: 'EO/IR', protocol: 'RTSP', adapter: 'video', status: 'online', capabilities: ['camera.eo', 'video.stream'] },
+    { id: 'DEV-GPS-1', organizationId: orgId, manufacturer: 'u-blox', model: 'F9P', protocol: 'MAVLINK', adapter: 'skynode', status: 'online', capabilities: ['navigation.read'] },
+  ];
+  for (const d of devices) store.devices.set(d.id, d);
+  store.linkAssetDevice('UAV-01', 'DEV-SKY-1', { role: 'autopilot', isPrimary: true });
+  store.linkAssetDevice('UAV-01', 'DEV-CAM-1', { role: 'camera-eo' });
+  store.linkAssetDevice('UAV-01', 'DEV-GPS-1', { role: 'gps' });
+
+  // edge agent representing UAV-01 (software representative of the asset)
+  store.agents.set('AGENT-UAV-01', {
+    id: 'AGENT-UAV-01', assetId: 'UAV-01', organizationId: orgId, operationId: 'op-demo',
+    deviceIds: ['DEV-SKY-1', 'DEV-CAM-1', 'DEV-GPS-1'],
+    capabilities: ['telemetry.read', 'camera.eo', 'diagnostics.read'],
+    connectionStatus: 'online', lastSeenAt: Date.now(),
+  });
+
   // no-fly zone near the center (a small square) — assets entering trigger alerts
   const d = 0.03;
   store.geofences.set('gf-nofly', {

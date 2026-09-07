@@ -40,8 +40,11 @@ export const RawEventSchema = z.object({
   receivedAt: z.number().positive(),
   parserVersion: z.string().min(1),
   correlationId: z.string().min(1),
+  processingStatus: z.enum(['received', 'validated', 'normalized', 'quarantined', 'failed', 'reprocessed']).optional(),
+  organizationId: z.string().optional(),
   deviceId: z.string().optional(),
   assetId: z.string().optional(),
+  agentId: z.string().optional(),
 }).passthrough();
 
 /** asset.v1 — a registered asset (vendor-neutral). */

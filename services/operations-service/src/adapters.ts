@@ -35,6 +35,7 @@ export function buildContext(store: Store, bus: Bus, alerts: AlertEngine, fusion
       const res = validate('telemetry.v1', t);
       if (!res.valid) {
         metrics.counter('validation_failures_total', 'payloads that failed schema validation').inc(1, { source: provenance?.sourceProtocol ?? 'unknown' });
+        if (provenance?.rawEventId) store.setRawEventStatus(provenance.rawEventId, 'quarantined');
         store.addQuarantine({
           id: newId(), schemaId: res.schemaId, schemaVersion: res.schemaVersion, errors: res.errors,
           source: provenance?.sourceProtocol ?? 'unknown', rawEventId: provenance?.rawEventId,
@@ -46,8 +47,10 @@ export function buildContext(store: Store, bus: Bus, alerts: AlertEngine, fusion
         bus.publish(envelope('event', ev));
         return;
       }
+      if (provenance?.rawEventId) store.setRawEventStatus(provenance.rawEventId, 'validated');
       const asset = store.applyTelemetry(t);
       if (!asset) return;
+      if (provenance?.rawEventId) store.setRawEventStatus(provenance.rawEventId, 'normalized');
       const meta: EventMeta = {
         source: provenance?.sourceProtocol ?? 'core',
         correlationId: provenance?.correlationId,

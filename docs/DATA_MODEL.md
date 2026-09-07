@@ -4,6 +4,32 @@ Canonical TypeScript definitions: `packages/shared-types`. SQL schema (Phase 1+)
 `infrastructure/database/init.sql`. Telemetry & positions are time-series and
 belong in TimescaleDB hypertables; everything else in PostgreSQL/PostGIS.
 
+## Operational ontology (Database V2)
+
+Two hierarchies are kept **separate** (home ownership vs temporary assignment):
+
+```
+Permanent org:  Organization → Region → OperationsCenter → Unit → Team → (User via TeamMembership)
+Assets/devices: Asset (home-owned by a Unit) ── AssetDevice ──► Device   (over time)
+                Agent REPRESENTS Asset
+Temporary:      Asset ASSIGNED_TO Operation   (operation_assignments)
+```
+
+- **Asset↔Device** is modeled as `asset_devices` (asset_id, device_id, role,
+  is_primary, installed_at, removed_at), **not** `assets.device_id` (deprecated):
+  an Asset has many Devices and a Device may move between Assets over time.
+- **RawEvent** is durable and append-only with a `processing_status` lifecycle
+  (`received → validated → normalized`, or `quarantined`/`failed`/`reprocessed`);
+  payloads are immutable (enforced by a DB trigger) so events can be safely
+  reprocessed. Carries organization/operation/asset/device/agent ids,
+  adapterId/version, correlationId, deduplicationKey, checksum.
+- **Agent** is the software representative of an Asset at the edge (agentId,
+  assetId, deviceIds, capabilities, connectionStatus).
+
+Migrations: `infrastructure/database/migrations/*.sql` (forward-only) + the
+`migrate.mjs` runner; `init.sql` is the 0000 baseline. Memory store remains the
+tested dev/test path.
+
 ## Multi-organization (§15)
 
 Every row is scoped by `org_id`. Organization data is isolated: queries always

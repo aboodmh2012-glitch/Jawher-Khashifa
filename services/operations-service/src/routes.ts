@@ -65,6 +65,36 @@ export function registerRoutes(app: FastifyInstance, store: Store, bus: Bus, rep
     return [...store.users.values()].filter((u) => !org || u.orgId === org);
   });
 
+  // ---- operational ontology (org hierarchy, devices, agents) ----
+  app.get('/api/org/hierarchy', async (req, reply) => {
+    const a = can(req, reply, 'organization.read'); if (!a) return;
+    const org = scope(a);
+    const byOrg = <T extends { organizationId?: string }>(it: Iterable<T>) => [...it].filter((x) => !org || x.organizationId === org);
+    return {
+      regions: byOrg(store.regions.values()),
+      operationsCenters: byOrg(store.operationsCenters.values()),
+      units: byOrg(store.units.values()),
+      teams: [...store.teams.values()].filter((t) => !org || t.orgId === org),
+    };
+  });
+  app.get('/api/devices', async (req, reply) => {
+    const a = can(req, reply, 'asset.read'); if (!a) return;
+    const org = scope(a);
+    return [...store.devices.values()].filter((d) => !org || d.organizationId === org);
+  });
+  app.get('/api/assets/:id/devices', async (req, reply) => {
+    const a = can(req, reply, 'asset.read'); if (!a) return;
+    const id = (req.params as { id: string }).id;
+    const asset = store.assets.get(id);
+    if (scope(a) && asset && asset.orgId !== a.orgId) return reply.code(404).send({ error: 'not found' });
+    return store.devicesOfAsset(id);
+  });
+  app.get('/api/agents', async (req, reply) => {
+    const a = can(req, reply, 'asset.read'); if (!a) return;
+    const org = scope(a);
+    return [...store.agents.values()].filter((ag) => !org || ag.organizationId === org);
+  });
+
   // ---- assets & telemetry ----
   app.get('/api/assets', async (req, reply) => {
     const a = can(req, reply, 'asset.read'); if (!a) return;

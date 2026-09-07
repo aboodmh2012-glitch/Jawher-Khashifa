@@ -7,7 +7,8 @@ import { randomUUID } from 'node:crypto';
 import type {
   Asset, Alert, Incident, OperationalTask, OpsEvent, Geofence, RouteEntity,
   AuditLog, User, Organization, TelemetrySample, NormalizedTelemetry, LinkState,
-  RawEvent, Operation, Feature, Group, TelemetryChannel, Observation, Track,
+  RawEvent, RawEventStatus, Operation, Feature, Group, TelemetryChannel, Observation, Track,
+  Region, OperationsCenter, Unit, Team, TeamMembership, Device, AssetDevice, Agent,
 } from '@fusion/shared-types';
 import type { QuarantinedEvent } from '@fusion/validation';
 
@@ -32,7 +33,15 @@ const TELEMETRY_CAP = 600; // ~10 min at 1 Hz per asset
 
 export class Store {
   orgs = new Map<string, Organization>();
+  regions = new Map<string, Region>();
+  operationsCenters = new Map<string, OperationsCenter>();
+  units = new Map<string, Unit>();
+  teams = new Map<string, Team>();
+  teamMemberships: TeamMembership[] = [];
   users = new Map<string, User>();
+  devices = new Map<string, Device>();
+  assetDevices: AssetDevice[] = [];
+  agents = new Map<string, Agent>();
   assets = new Map<string, Asset>();
   incidents = new Map<string, Incident>();
   tasks = new Map<string, OperationalTask>();
@@ -198,16 +207,48 @@ export class Store {
   }
 
   // ---- raw-event journal (replayability) ----
-  addRawEvent(protocol: string, messageType: string, payload: unknown, ref?: { deviceId?: string; assetId?: string }): RawEvent {
+  addRawEvent(protocol: string, messageType: string, payload: unknown, ref?: { deviceId?: string; assetId?: string; agentId?: string }): RawEvent {
     const raw: RawEvent = {
-      id: randomUUID(), protocol, messageType, payload,
+      id: randomUUID(), organizationId: this.orgId, protocol, messageType, payload,
       payloadFormat: typeof payload === 'string' ? 'text' : 'json',
-      receivedAt: Date.now(), parserVersion: '0.1.0', correlationId: randomUUID(),
-      deviceId: ref?.deviceId, assetId: ref?.assetId,
+      receivedAt: Date.now(), parserVersion: '0.1.0', schemaVersion: 1, correlationId: randomUUID(),
+      adapterId: protocol.toLowerCase(), processingStatus: 'received',
+      deviceId: ref?.deviceId, assetId: ref?.assetId, agentId: ref?.agentId,
     };
     this.rawEvents.push(raw);
     if (this.rawEvents.length > RAW_CAP) this.rawEvents.shift();
     return raw;
+  }
+
+  /** Advance a raw event's processing status — payload stays immutable. */
+  setRawEventStatus(id: string, status: RawEventStatus): void {
+    const raw = this.rawEvents.find((r) => r.id === id);
+    if (raw) raw.processingStatus = status;
+  }
+
+  // ---- Asset ↔ Device relationship (over time) ----
+  linkAssetDevice(assetId: string, deviceId: string, opts: { role?: string; isPrimary?: boolean } = {}): AssetDevice {
+    const link: AssetDevice = {
+      id: randomUUID(), assetId, deviceId, role: opts.role,
+      isPrimary: opts.isPrimary ?? false, installedAt: Date.now(),
+    };
+    this.assetDevices.push(link);
+    return link;
+  }
+  /** Remove a device from an asset (it may later be mounted on another). */
+  unlinkAssetDevice(assetId: string, deviceId: string): void {
+    for (const l of this.assetDevices) {
+      if (l.assetId === assetId && l.deviceId === deviceId && l.removedAt == null) l.removedAt = Date.now();
+    }
+  }
+  /** Devices currently mounted on an asset. */
+  devicesOfAsset(assetId: string): Device[] {
+    const ids = this.assetDevices.filter((l) => l.assetId === assetId && l.removedAt == null).map((l) => l.deviceId);
+    return ids.map((id) => this.devices.get(id)).filter((d): d is Device => !!d);
+  }
+  /** The asset a device is currently mounted on, if any. */
+  assetOfDevice(deviceId: string): string | undefined {
+    return this.assetDevices.find((l) => l.deviceId === deviceId && l.removedAt == null)?.assetId;
   }
 
   addQuarantine(q: QuarantinedEvent): QuarantinedEvent {
