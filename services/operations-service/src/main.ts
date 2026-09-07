@@ -11,6 +11,7 @@ import { Store } from './store.js';
 import { createBus } from './bus.js';
 import { AlertEngine } from './alerts.js';
 import { registerRoutes } from './routes.js';
+import { registerReplayRoutes } from './replay-routes.js';
 import { registerRealtime } from './realtime.js';
 import { startAdapters } from './adapters.js';
 import { seedDemo } from './seed.js';
@@ -73,6 +74,7 @@ export async function buildApp(): Promise<BuiltApp> {
 
   seedDemo(store);
   registerRoutes(app, store, bus, repositories);
+  registerReplayRoutes(app, store);
   registerRealtime(app, store, bus);
   const stopAdapters = startAdapters(store, bus, alerts, fusion);
 
